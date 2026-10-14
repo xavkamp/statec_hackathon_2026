@@ -1,0 +1,17 @@
+The goal is to provide the most effective representation of Luxembourg’s external trade data.
+
+- Who are Luxembourg’s main trading partners ? (exports and imports)? How have they evolved over time?
+- What are the main categories of goods exported from and imported into Luxembourg ? How have these patterns changed over time?
+- For a given product category, who are
+Luxembourg’s principal trading partners
+(exports and imports)?
+- For a given partner country, what are the main
+goods traded with Luxembourg? (using 2-digit
+product codes) How can increasingly detailed levels
+of information (up to 8-digit product codes) be
+displayed while highlighting only the most
+significant trade flows?
+- Luxembourg’s trade compared with that of other countries?
+- Do Luxembourg’s trade flows exhibit specific seasonal patterns, either overall or for particular product categories? How can their evolution best be visualized while filtering out purely seasonal effects?
+
+Use the dataset from Eurostat on EU Trade, "[ds-045409] EU trade since 1988 by HS2-4-6 and CN8" (URL: https://ec.europa.eu/eurostat/databrowser/view/ds-045409/legacyMultiFreq/table?category=ext_go.ext_go_detail)
