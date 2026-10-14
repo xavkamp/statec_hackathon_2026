@@ -69,6 +69,36 @@ python run_pipeline.py --help
 
 ---
 
+## Dual-Audience Dashboard Architecture
+
+The dashboard is structured into two distinct operational modes to serve two target audiences:
+
+### 1. 🏛️ National Leadership Briefing (Answers Pressing Questions First)
+Designed for national leaders, ministers, policy makers, and directors who require an immediate, high-impact assessment of Luxembourg's sovereign supply chain resilience and economic security:
+* **Sovereign Supply Chain & Resilience Radar (Default on Load)**:
+  * **Executive Alert Tiles**: Instant visibility into single-point energy vulnerabilities, port corridor transit risks, the macro service buffer, and seasonal supply dips.
+  * **Strategic Basket Vulnerability Chart**: Compares 6 vital import baskets (Energy, Food, Health, Tech, Raw Materials, Vehicles) on Supplier Concentration Index (HHI), Top Supplier Dominance (%), and Hub Transit Dependency (%).
+  * **Stress-Test Basket Cards**: Individual risk cards with HHI badges (High / Moderate / Diversified), leading 4-digit good vulnerabilities, and single-click links to granular analyst data.
+  * **Sovereign Policy Recommendations**: Concrete safeguards regarding petroleum stockpiles, port agreements with Antwerp/Rotterdam, and hospital medicine reserves.
+* **Macroeconomic Health & Sovereignty**:
+  * 25-year trade volume trajectory (+89% growth).
+  * Plain-language explanation of the structural merchandise trade deficit (-€9.2B) and why a ~65% goods coverage ratio is sustainably balanced by Luxembourg's €25B+ services surplus.
+  * Intra-EU integration (>80%) single-market cushion.
+* **Geopolitical Exposure & Seasonal Shocks**:
+  * Direct neighbor import dependency (Belgium 32.9%, Germany 28.2%, France 12.5% = 73.6% of physical imports).
+  * Third-country geopolitical exposure (United States, China, United Kingdom).
+  * Operational warning regarding the annual **August -14.4% trade contraction** during collective industrial leave ("congé collectif").
+
+### 2. 🔬 Data Analyst Deep-Dive Suite (Explore Details Afterwards)
+Designed for economists, trade researchers, and data analysts requiring granular micro-data exploration tools:
+* **Tab 1: Trading Partners & Global Map (Q1)**: Interactive choropleth map linked to ISO-3 country codes with regional scope zoom (🇪🇺 Europe, 🌍 World, 🌎 Americas, 🌏 Asia), metric toggle (Trade Value vs Market Share), interactive click-to-spotlight synchronization with Top 10 partner bar charts, and 25-year historical share evolution.
+* **Tab 2: Product Categories & Structural Shift (Q2)**: Multi-level treemaps (HS Section $\rightarrow$ HS2 Chapter $\rightarrow$ HS4 Subheading) and 25-year structural transformation charts from steel to advanced machinery and automotive.
+* **Tab 3: Hierarchical Micro-Flows HS2 $\rightarrow$ HS4 $\rightarrow$ CN8 (Q3 & Q4)**: Product partner choropleth map and concentration analysis (Q3) with interactive supplier click-spotlight, and partner-specific tariff line drilldowns up to 8-digit CN8 codes with dynamic significance threshold filtering (Q4).
+* **Tab 4: Econometric Seasonality & Trend Lab (Q6)**: Decomposition into raw observed series, 12-month centered rolling trend, and seasonally adjusted series with empirical month-of-year seasonal factors.
+* **Tab 5: Regional Peer Benchmarking (Q5)**: Comparative volume expansion index (2000 = 100) and merchandise coverage ratio benchmarks against Germany, France, Belgium, and the Netherlands.
+
+---
+
 ## Answers to Hackathon Research Questions
 
 ### Q1: Trading Partners & Evolution
