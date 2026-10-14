@@ -1,4 +1,4 @@
-"""Design System tokens and Plotly figure templates for STATEC Hackathon 2026.
+"""Design System tokens and Plotly figure helpers for STATEC Hackathon 2026.
 Follows clean modern typography and accessible color palettes.
 """
 
@@ -21,7 +21,7 @@ CATEGORICAL = [
     "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16"
 ]
 
-# Plotly Template Default Layout
+# Base Layout Dictionary (does not define xaxis/yaxis to prevent duplicate keyword conflicts)
 PLOT_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
@@ -33,18 +33,6 @@ PLOT_LAYOUT = dict(
         font_color="#F8FAFC",
         font_family="Inter, sans-serif"
     ),
-    xaxis=dict(
-        gridcolor="#F1F5F9",
-        zerolinecolor="#E2E8F0",
-        tickfont=dict(color=NEUTRAL, size=11),
-        title_font=dict(color=TEXT_PRIMARY, size=12, weight="bold")
-    ),
-    yaxis=dict(
-        gridcolor="#F1F5F9",
-        zerolinecolor="#E2E8F0",
-        tickfont=dict(color=NEUTRAL, size=11),
-        title_font=dict(color=TEXT_PRIMARY, size=12, weight="bold")
-    ),
     legend=dict(
         orientation="h",
         yanchor="bottom",
@@ -54,6 +42,60 @@ PLOT_LAYOUT = dict(
         font=dict(color=NEUTRAL, size=11)
     )
 )
+
+def apply_plot_theme(fig, title=None, x_title=None, y_title=None, hovermode=None, dtick_x=None, autorange_y=None):
+    """Apply consistent styling across all Plotly figures without duplicate keyword argument collisions."""
+    layout_update = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color=TEXT_PRIMARY, size=12),
+        margin=dict(l=40, r=30, t=50, b=40),
+        hoverlabel=dict(
+            bgcolor="#1E293B",
+            font_size=12,
+            font_color="#F8FAFC",
+            font_family="Inter, sans-serif"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(color=NEUTRAL, size=11)
+        )
+    )
+    if title:
+        layout_update["title"] = dict(text=f"<b>{title}</b>", font=dict(size=14, color=TEXT_PRIMARY))
+    if hovermode:
+        layout_update["hovermode"] = hovermode
+
+    fig.update_layout(**layout_update)
+
+    xaxis_update = dict(
+        gridcolor="#F1F5F9",
+        zerolinecolor="#E2E8F0",
+        tickfont=dict(color=NEUTRAL, size=11),
+    )
+    if x_title:
+        xaxis_update["title"] = dict(text=x_title, font=dict(color=TEXT_PRIMARY, size=12, weight="bold"))
+    if dtick_x:
+        xaxis_update["tickmode"] = "linear"
+        xaxis_update["dtick"] = dtick_x
+    fig.update_xaxes(**xaxis_update)
+
+    yaxis_update = dict(
+        gridcolor="#F1F5F9",
+        zerolinecolor="#E2E8F0",
+        tickfont=dict(color=NEUTRAL, size=11),
+    )
+    if y_title:
+        yaxis_update["title"] = dict(text=y_title, font=dict(color=TEXT_PRIMARY, size=12, weight="bold"))
+    if autorange_y:
+        yaxis_update["autorange"] = autorange_y
+    fig.update_yaxes(**yaxis_update)
+
+    return fig
 
 # Custom CSS styling dictionary
 CARD_STYLE = {

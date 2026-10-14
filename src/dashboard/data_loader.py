@@ -1,78 +1,83 @@
 """Data loader module for the dashboard.
-Provides cached access to Gold Parquet datasets.
+Loads processed CSV datasets directly using pandas.read_csv with smart mtime cache invalidation.
 """
 
-from functools import lru_cache
-import pandas as pd
 from pathlib import Path
 import sys
+import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.config import GOLD_DIR
+from src.config import PROCESSED_DIR
+
+_CACHE = {}
+_MTIME = {}
 
 
-@lru_cache(maxsize=1)
+def _load_csv_cached(filename: str, dtype: dict = None) -> pd.DataFrame:
+    """Load CSV with automatic cache invalidation when file mtime changes."""
+    path = PROCESSED_DIR / filename
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        mtime = path.stat().st_mtime
+        if filename in _CACHE and _MTIME.get(filename) == mtime and not _CACHE[filename].empty:
+            return _CACHE[filename]
+        df = pd.read_csv(path, dtype=dtype)
+        if not df.empty:
+            # Normalize product codes if present
+            if "hs2_code" in df.columns:
+                df["hs2_code"] = df["hs2_code"].astype(str).str.zfill(2)
+            if "product_code" in df.columns:
+                df["product_code"] = df["product_code"].astype(str)
+            _CACHE[filename] = df
+            _MTIME[filename] = mtime
+        return df
+    except Exception as e:
+        if filename in _CACHE:
+            return _CACHE[filename]
+        return pd.DataFrame()
+
+
 def load_overview_kpis() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_overview_kpis.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("overview_kpis.csv")
 
 
-@lru_cache(maxsize=1)
 def load_partner_rankings() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_partner_rankings.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("partner_rankings.csv", dtype={"partner_code": str})
 
 
-@lru_cache(maxsize=1)
 def load_product_rankings() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_product_rankings.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("product_rankings.csv", dtype={"hs2_code": str})
 
 
-@lru_cache(maxsize=1)
+def load_product_partners() -> pd.DataFrame:
+    return _load_csv_cached("product_partners.csv", dtype={"hs2_code": str, "partner_code": str})
+
+
 def load_seasonal_decomposition() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_seasonal_decomposition.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("seasonal_decomposition.csv")
 
 
-@lru_cache(maxsize=1)
 def load_country_benchmarks() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_country_benchmarks.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("country_benchmarks.csv")
 
 
-@lru_cache(maxsize=1)
 def load_drilldown_lvl2() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_partner_drilldown_lvl2.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("partner_drilldown_lvl2.csv")
 
 
-@lru_cache(maxsize=1)
 def load_drilldown_lvl4() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_partner_drilldown_lvl4.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("partner_drilldown_lvl4.csv")
 
 
-@lru_cache(maxsize=1)
 def load_drilldown_lvl8() -> pd.DataFrame:
-    path = GOLD_DIR / "gold_partner_drilldown_lvl8.parquet"
-    if path.exists():
-        return pd.read_parquet(path)
-    return pd.DataFrame()
+    return _load_csv_cached("partner_drilldown_lvl8.csv")
+
+
+def clear_loader_cache():
+    """Clear memory caches when datasets are re-processed."""
+    _CACHE.clear()
+    _MTIME.clear()

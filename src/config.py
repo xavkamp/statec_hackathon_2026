@@ -1,6 +1,7 @@
 """Configuration constants for STATEC Hackathon 2026 - Luxembourg External Trade.
 Dataset: Eurostat ds-045409 (EU trade since 1988 by HS2-4-6 and CN8)
 Time span: 2000 - 2026
+Format: Tabular CSV
 """
 
 from pathlib import Path
@@ -8,9 +9,8 @@ from pathlib import Path
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-BRONZE_DIR = DATA_DIR / "bronze"
-SILVER_DIR = DATA_DIR / "silver"
-GOLD_DIR = DATA_DIR / "gold"
+RAW_DIR = DATA_DIR / "raw"
+PROCESSED_DIR = DATA_DIR / "processed"
 
 # Eurostat Comext API
 COMEXT_API_URL = "https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/ds-045409"

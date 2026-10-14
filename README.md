@@ -6,35 +6,33 @@ Powered by Eurostat Comext dataset **`[ds-045409]`** (*"EU trade since 1988 by H
 
 ---
 
-## Architecture Overview
+## Architecture Overview (Pure Tabular CSV Pipeline)
 
-Built following the **Medallion Data Architecture** (Bronze $\rightarrow$ Silver $\rightarrow$ Gold) and modern dashboard principles:
+Built using a two-stage **Tabular CSV Architecture** (`data/raw/` $\rightarrow$ `data/processed/`):
 
 ```
 Eurostat Comext API (ds-045409)
            │
            ▼
-┌───────────────────────┐
-│     Bronze Layer      │  Raw JSON responses cached in data/bronze/
-│ (Landing & Ingestion) │  • Partners (2000-2026) • HS2 Chapters • Benchmarks • Seasonality • Drilldowns
-└──────────┬────────────┘
+┌────────────────────────┐
+│     Raw CSV Layer      │  Direct extraction from Eurostat API to CSV in data/raw/
+│   (Extracted Tabular)  │  • partners_annual_raw.csv • hs2_products_annual_raw.csv
+│                        │  • country_benchmarks_annual_raw.csv • monthly_seasonality_raw.csv
+│                        │  • partner_drilldown_raw.csv
+└──────────┬─────────────┘
            │
            ▼
-┌───────────────────────┐
-│     Silver Layer      │  Cleaned, typed, validated Parquet tables in data/silver/
-│  (Cleansing & Typing) │  • Standardized country codes, flows, date dimensions, HS sections
-└──────────┬────────────┘
-           │
-           ▼
-┌───────────────────────┐
-│      Gold Layer       │  Serving tables & analytical models in data/gold/
-│ (Aggregates & Models) │  • Overview KPIs • Rankings • Seasonal decomposition • Peer benchmarks
-└──────────┬────────────┘
+┌────────────────────────┐
+│   Processed CSV Layer  │  Aggregated & model-ready CSV tables in data/processed/
+│  (Serving & Analytics) │  • overview_kpis.csv • partner_rankings.csv • product_rankings.csv
+│                        │  • seasonal_decomposition.csv • country_benchmarks.csv
+│                        │  • partner_drilldown_lvl2.csv, lvl4.csv, lvl8.csv
+└──────────┬─────────────┘
            │
            ▼
 ┌────────────────────────────────────────────────────────┐
 │             Interactive Dash Web Application           │
-│  http://127.0.0.1:8050 • Multi-Tab Exploratory UI      │
+│  http://127.0.0.1:8050 • Reads directly from CSV       │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -64,8 +62,9 @@ python run_pipeline.py --help
 #   --ingest   Fetch latest data from Eurostat Comext API into data/bronze/
 #   --silver   Transform bronze JSON files into silver Parquet tables
 #   --gold     Compute gold analytical models and aggregates
+#   --csv      Export all tables to human-readable CSV format in data/csv/
 #   --app      Start the interactive Dash web application
-#   --all      Run end-to-end pipeline (Bronze -> Silver -> Gold -> App)
+#   --all      Run end-to-end pipeline (Bronze -> Silver -> Gold -> CSV -> App)
 ```
 
 ---
@@ -106,15 +105,34 @@ python run_pipeline.py --help
 ```
 statec_hackathon_2026/
 ├── data/
-│   ├── bronze/          # Raw cached Eurostat Comext responses (.json)
-│   ├── silver/          # Clean typed Parquet tables (.parquet)
-│   └── gold/            # Analytical serving Parquet tables (.parquet)
+│   ├── raw/                      # Raw extracted CSV files from Eurostat API
+│   │   ├── partners_annual_raw.csv
+│   │   ├── hs2_products_annual_raw.csv
+│   │   ├── country_benchmarks_annual_raw.csv
+│   │   ├── monthly_seasonality_raw.csv
+│   │   └── partner_drilldown_raw.csv
+│   └── processed/                # Analytical & model-ready serving CSV files
+│       ├── overview_kpis.csv
+│       ├── partner_rankings.csv
+│       ├── product_rankings.csv
+│       ├── seasonal_decomposition.csv
+│       ├── country_benchmarks.csv
+│       ├── partner_drilldown_lvl2.csv
+│       ├── partner_drilldown_lvl4.csv
+│       └── partner_drilldown_lvl8.csv
 ├── src/
-│   ├── config.py        # Central parameters (2000-2026, endpoints, HS sections)
-│   ├── ingestion/       # Eurostat Comext API fetcher & JSON-stat parser
-│   ├── processing/      # Silver & Gold transformation pipelines
-│   └── dashboard/       # Dash interactive application & design system
-├── objectives.txt       # Hackathon problem statement
-├── run_pipeline.py      # Master CLI runner
+│   ├── config.py                 # Central parameters (2000-2026, endpoints, HS sections)
+│   ├── ingestion/
+│   │   ├── fetch_data.py         # Direct Eurostat API extraction to CSV
+│   │   └── jsonstat_parser.py    # Vectorized in-memory parser
+│   ├── processing/
+│   │   └── process_data.py       # Raw CSV to processed CSV transformation
+│   └── dashboard/
+│       ├── app.py                # Interactive Dash web application
+│       ├── data_loader.py        # Cached CSV loader
+│       └── design_system.py      # Plotly styling, colors, and layout helpers
+├── objectives.txt                # Hackathon problem statement
+├── run_pipeline.py               # Master CLI runner
+├── requirements.txt              # Project dependencies
 └── README.md
 ```
