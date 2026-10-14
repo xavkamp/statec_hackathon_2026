@@ -221,27 +221,59 @@ def fetch_product_partners_csv(force_reload: bool = False) -> Path:
     return output_file
 
 
+def fetch_hs4_products_annual_csv(years: List[int] = [2020, 2021, 2022, 2023, 2024], force_reload: bool = False) -> Path:
+    """Fetch Luxembourg annual trade for all 4-digit HS subheadings directly to CSV."""
+    output_file = RAW_DIR / "hs4_products_annual_raw.csv"
+    if output_file.exists() and not force_reload:
+        logger.info(f"Using existing raw file: {output_file.name}")
+        return output_file
+
+    dfs = []
+    for y in years:
+        url = (
+            f"{COMEXT_API_URL}?freq=A&reporter={PRIMARY_REPORTER}&partner=WORLD"
+            f"&time={y}&indicators=VALUE_IN_EUROS"
+        )
+        try:
+            df = fetch_jsonstat_df(url)
+            if not df.empty:
+                df["code_len"] = df["product"].astype(str).str.len()
+                df4 = df[df["code_len"] == 4].drop(columns=["code_len"]).copy()
+                dfs.append(df4)
+        except Exception as e:
+            logger.error(f"Error fetching HS4 products for {y}: {e}")
+
+    combined_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    combined_df.to_csv(output_file, index=False, encoding="utf-8")
+    logger.info(f"Saved {output_file.name}: {len(combined_df):,} rows")
+    return output_file
+
+
 def run_all_ingestion(force_reload: bool = False):
     """Run full ingestion pipeline writing directly to CSV."""
     logger.info("=== Starting Eurostat Comext Ingestion to Tabular CSV (data/raw/) ===")
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info("1/6: Extracting annual partner trade to CSV...")
+    logger.info("1/7: Extracting annual partner trade to CSV...")
     fetch_partners_annual_csv(force_reload=force_reload)
 
-    logger.info("2/6: Extracting annual HS2 product trade to CSV...")
+    logger.info("2/7: Extracting annual HS2 product trade to CSV...")
     fetch_hs2_products_annual_csv(force_reload=force_reload)
 
-    logger.info("3/6: Extracting peer country benchmarks to CSV...")
+    logger.info("3/7: Extracting annual HS4 product subheadings to CSV...")
+    fetch_hs4_products_annual_csv(force_reload=force_reload)
+
+    logger.info("4/7: Extracting peer country benchmarks to CSV...")
     fetch_country_benchmarks_csv(force_reload=force_reload)
 
-    logger.info("4/6: Extracting monthly seasonality data to CSV...")
+    logger.info("5/7: Extracting monthly seasonality data to CSV...")
     fetch_monthly_seasonality_csv(force_reload=force_reload)
 
-    logger.info("5/6: Extracting hierarchical partner drilldown (HS2 -> CN8) to CSV...")
+    logger.info("6/7: Extracting hierarchical partner drilldown (HS2 -> CN8) to CSV...")
     fetch_partner_drilldown_csv(force_reload=force_reload)
 
-    logger.info("6/6: Extracting product trading partners (HS2 across countries) to CSV...")
+    logger.info("7/7: Extracting product trading partners (HS2 across countries) to CSV...")
     fetch_product_partners_csv(force_reload=force_reload)
 
     logger.info("=== Tabular CSV Ingestion Completed Successfully ===")
@@ -249,4 +281,5 @@ def run_all_ingestion(force_reload: bool = False):
 
 if __name__ == "__main__":
     run_all_ingestion()
+
 

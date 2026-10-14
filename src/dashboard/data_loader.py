@@ -30,6 +30,10 @@ def _load_csv_cached(filename: str, dtype: dict = None) -> pd.DataFrame:
             # Normalize product codes if present
             if "hs2_code" in df.columns:
                 df["hs2_code"] = df["hs2_code"].astype(str).str.zfill(2)
+            if "hs4_code" in df.columns:
+                df["hs4_code"] = df["hs4_code"].astype(str).str.zfill(4)
+            if "hs2_parent" in df.columns:
+                df["hs2_parent"] = df["hs2_parent"].astype(str).str.zfill(2)
             if "product_code" in df.columns:
                 df["product_code"] = df["product_code"].astype(str)
             _CACHE[filename] = df
@@ -53,8 +57,13 @@ def load_product_rankings() -> pd.DataFrame:
     return _load_csv_cached("product_rankings.csv", dtype={"hs2_code": str})
 
 
+def load_hs4_product_rankings() -> pd.DataFrame:
+    return _load_csv_cached("hs4_product_rankings.csv", dtype={"hs4_code": str, "hs2_parent": str})
+
+
 def load_product_partners() -> pd.DataFrame:
     return _load_csv_cached("product_partners.csv", dtype={"hs2_code": str, "partner_code": str})
+
 
 
 def load_seasonal_decomposition() -> pd.DataFrame:

@@ -26,9 +26,10 @@ from src.dashboard.design_system import (
 )
 from src.dashboard.data_loader import (
     load_overview_kpis, load_partner_rankings, load_product_rankings,
-    load_product_partners, load_seasonal_decomposition, load_country_benchmarks,
-    load_drilldown_lvl2, load_drilldown_lvl4, load_drilldown_lvl8
+    load_hs4_product_rankings, load_product_partners, load_seasonal_decomposition,
+    load_country_benchmarks, load_drilldown_lvl2, load_drilldown_lvl4, load_drilldown_lvl8
 )
+
 
 # Initialize Dash App
 app = dash.Dash(
@@ -467,9 +468,20 @@ def render_tab_products(selected_year):
                             ],
                             value="EXPORT",
                             inline=True,
+                            style={"fontSize": "13px", "marginRight": "24px"}
+                        ),
+                        html.Label("Granularity:", style={"fontWeight": "700", "fontSize": "13px", "marginRight": "14px"}),
+                        dbc.RadioItems(
+                            id="prod-granularity-radio",
+                            options=[
+                                {"label": "2-Digit (HS2 Chapters)", "value": 2},
+                                {"label": "4-Digit (HS4 Subheadings)", "value": 4},
+                            ],
+                            value=2,
+                            inline=True,
                             style={"fontSize": "13px"}
                         )
-                    ], className="d-flex align-items-center mb-3"),
+                    ], className="d-flex align-items-center mb-3 flex-wrap"),
                     html.H6(id="prod-treemap-title", style={"fontWeight": "700"}),
                     dcc.Graph(id="prod-treemap-graph", config={"displayModeBar": False})
                 ], style=CARD_STYLE)
@@ -484,8 +496,8 @@ def render_tab_products(selected_year):
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6("Structural Shifts in Product Composition (2000 vs Recent)", style={"fontWeight": "700", "marginBottom": "4px"}),
-                    html.P("Evolution of key HS2 chapters: Historical diversification from primary steel/metals to high-value machinery, vehicles, and plastics.", className="text-muted", style={"fontSize": "12px"}),
+                    html.H6(id="prod-shift-title", style={"fontWeight": "700", "marginBottom": "4px"}),
+                    html.P("Evolution of key product lines: Tracking long-term structural changes across Luxembourg's manufacturing and merchandise trade.", className="text-muted", style={"fontSize": "12px"}),
                     dcc.Graph(id="prod-shift-graph", config={"displayModeBar": False})
                 ], style=CARD_STYLE)
             ], md=12)
@@ -498,11 +510,72 @@ def render_tab_products(selected_year):
     Output("prod-treemap-graph", "figure"),
     Output("prod-top10-title", "children"),
     Output("prod-top10-graph", "figure"),
+    Output("prod-shift-title", "children"),
     Output("prod-shift-graph", "figure"),
     Input("prod-flow-radio", "value"),
-    Input("global-year-dropdown", "value")
+    Input("global-year-dropdown", "value"),
+    Input("prod-granularity-radio", "value")
 )
-def update_product_tab(flow, year):
+def update_product_tab(flow, year, granularity):
+    if granularity == 4:
+        hs4_df = load_hs4_product_rankings()
+        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].copy()
+        if sub.empty and not hs4_df.empty:
+            sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
+
+        # 1. Multi-level Treemap: Section -> HS2 Chapter -> HS4 Subheading
+        sub["short_name"] = "HS " + sub["hs4_code"].astype(str) + ": " + sub["hs4_name"].apply(lambda s: (s[:28] + "..") if len(s) > 28 else s)
+        sub["chapter_label"] = "Chapter " + sub["hs2_parent"].astype(str)
+        fig_tree = px.treemap(
+            sub,
+            path=["hs_section", "chapter_label", "short_name"],
+            values="value_eur",
+            color="value_eur",
+            color_continuous_scale="Blues" if flow == "EXPORT" else "Purples",
+            hover_data={"value_eur": ":,.0f", "product_share_pct": ":.2f%", "share_in_chapter_pct": ":.1f%"}
+        )
+        fig_tree.update_layout(margin=dict(l=0, r=0, t=10, b=0))
+
+        # 2. Top 15 HS4 Subheadings Bar Chart
+        top15 = sub.sort_values("overall_rank").head(15).copy()
+        top15 = top15.sort_values("value_eur", ascending=True)
+
+        fig_top = go.Figure(go.Bar(
+            x=top15["value_eur"] / 1e6,
+            y=top15["short_name"],
+            orientation="h",
+            marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
+            text=top15.apply(lambda r: f"{r['product_share_pct']:.1f}% ({r['share_in_chapter_pct']:.0f}% of Ch.{r['hs2_parent']})", axis=1),
+            textposition="outside",
+            hovertemplate="%{y}: €%{x:.0f}M (%{text})<extra></extra>"
+        ))
+        apply_plot_theme(fig_top, x_title="Million Euros (€M)")
+        fig_top.update_layout(margin=dict(l=10, r=75, t=10, b=30), yaxis=dict(autorange="reversed"))
+
+        # 3. Top HS4 Shift over time
+        top_codes = top15.sort_values("value_eur", ascending=False).head(8)["hs4_code"].tolist()
+        hist_sub = hs4_df[(hs4_df["hs4_code"].isin(top_codes)) & (hs4_df["flow"] == flow)].copy()
+
+        fig_shift = go.Figure()
+        for i, code in enumerate(top_codes):
+            c_data = hist_sub[hist_sub["hs4_code"] == code].sort_values("year")
+            if not c_data.empty:
+                c_name = c_data["hs4_name"].iloc[0].split(";")[0].title()[:24]
+                fig_shift.add_trace(go.Scatter(
+                    x=c_data["year"], y=c_data["value_eur"] / 1e6,
+                    name=f"HS {code}: {c_name}", mode="lines+markers",
+                    line=dict(color=CATEGORICAL[i % len(CATEGORICAL)], width=2.5),
+                    marker=dict(size=5),
+                    hovertemplate=f"HS {code} ({c_name}): €%{{y:.0f}}M in %{{x}}<extra></extra>"
+                ))
+        apply_plot_theme(fig_shift, x_title="Year", y_title="Million Euros (€M)", dtick_x=1, hovermode="x unified")
+
+        tree_title = f"Hierarchical 4-Digit Product Treemap (Click to Zoom) ({flow.capitalize()} {year})"
+        bar_title = f"Top 15 Traded 4-Digit Goods ({year})"
+        shift_title = f"Evolution of Top 4-Digit Products Over Time (Million €)"
+        return tree_title, fig_tree, bar_title, fig_top, shift_title, fig_shift
+
+    # Standard 2-digit macro view
     prods_df = load_product_rankings()
     sub = prods_df[(prods_df["year"] == year) & (prods_df["flow"] == flow)].copy()
     if sub.empty:
@@ -558,7 +631,9 @@ def update_product_tab(flow, year):
 
     tree_title = f"Product Tree by HS Section & Chapter ({flow.capitalize()} {year})"
     bar_title = f"Top 10 Traded Product Chapters ({year})"
-    return tree_title, fig_tree, bar_title, fig_top10, fig_shift
+    shift_title = "Structural Shifts in Product Composition (2000 vs Recent)"
+    return tree_title, fig_tree, bar_title, fig_top10, shift_title, fig_shift
+
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -754,15 +829,42 @@ def update_q3_product_partners(product_code, flow, year):
     total_val = sub["total_eur"].iloc[0]
     hhi_score = sub["hhi"].iloc[0]
 
+    # Look up top 3 HS4 subheadings for this chapter
+    hs4_df = load_hs4_product_rankings()
+    sub_hs4 = hs4_df[(hs4_df["hs2_parent"] == product_code) & (hs4_df["flow"] == flow) & (hs4_df["year"] == year)].copy()
+    if sub_hs4.empty and not hs4_df.empty:
+        sub_hs4 = hs4_df[(hs4_df["hs2_parent"] == product_code) & (hs4_df["flow"] == flow) & (hs4_df["year"] == hs4_df["year"].max())].copy()
+
+    hs4_pills = []
+    if not sub_hs4.empty:
+        top3_hs4 = sub_hs4.sort_values("value_eur", ascending=False).head(3)
+        hs4_pills = [
+            html.Div([
+                html.Span("Leading 4-Digit Lines:", style={"fontSize": "11px", "fontWeight": "700", "color": TEXT_MUTED, "marginRight": "8px"}),
+            ] + [
+                html.Span(
+                    f"HS {r['hs4_code']}: {r['hs4_name'][:25]} ({r['share_in_chapter_pct']:.0f}% of ch.)",
+                    style={
+                        "backgroundColor": "#F8FAFC", "color": TEXT_PRIMARY, "padding": "3px 9px",
+                        "borderRadius": "12px", "fontSize": "11px", "fontWeight": "600",
+                        "marginRight": "6px", "border": f"1px solid {BORDER}", "marginBottom": "4px"
+                    }
+                ) for _, r in top3_hs4.iterrows()
+            ], className="d-flex align-items-center flex-wrap mt-2")
+        ]
+
     # Badge ribbon
     badge_html = html.Div([
-        html.Span(f"Total {flow.capitalize()}: {fmt_eur(total_val)}", style={
-            "backgroundColor": "#EFF6FF", "color": "#1D4ED8", "padding": "5px 12px",
-            "borderRadius": "20px", "fontWeight": "700", "fontSize": "12px", "marginRight": "10px",
-            "border": "1px solid #BFDBFE"
-        }),
-        get_concentration_badge(hhi_score),
-    ], className="d-flex align-items-center")
+        html.Div([
+            html.Span(f"Total {flow.capitalize()}: {fmt_eur(total_val)}", style={
+                "backgroundColor": "#EFF6FF", "color": "#1D4ED8", "padding": "5px 12px",
+                "borderRadius": "20px", "fontWeight": "700", "fontSize": "12px", "marginRight": "10px",
+                "border": "1px solid #BFDBFE"
+            }),
+            get_concentration_badge(hhi_score),
+        ], className="d-flex align-items-center"),
+    ] + hs4_pills)
+
 
     # Top 10 partners bar chart
     top10 = sub.sort_values("value_eur", ascending=False).head(10).copy()
@@ -1074,6 +1176,7 @@ def render_tab_resilience(selected_year):
         "Vehicles & Transport": {"chapters": ["87"], "desc": "Passenger cars, commercial transport equipment"},
     }
 
+    hs4_df = load_hs4_product_rankings()
     cards = []
     # Filter for import data in latest available year
     use_year = selected_year
@@ -1102,6 +1205,19 @@ def render_tab_resilience(selected_year):
             hub_val = partner_agg[partner_agg["partner_code"].isin(["BE", "NL"])]["value_eur"].sum()
             hub_share = (hub_val / total_b_val) * 100
 
+            # Top 4-digit good in basket
+            top_hs4_div = html.Div()
+            if not hs4_df.empty:
+                b_hs4 = hs4_df[(hs4_df["hs2_parent"].isin(chs)) & (hs4_df["flow"] == "IMPORT") & (hs4_df["year"] == use_year)]
+                if b_hs4.empty:
+                    b_hs4 = hs4_df[(hs4_df["hs2_parent"].isin(chs)) & (hs4_df["flow"] == "IMPORT") & (hs4_df["year"] == hs4_df["year"].max())]
+                if not b_hs4.empty:
+                    lead_h4 = b_hs4.sort_values("value_eur", ascending=False).iloc[0]
+                    top_hs4_div = html.Div([
+                        html.Span("Key 4-Digit Good: ", style={"fontSize": "11px", "color": TEXT_MUTED}),
+                        html.Strong(f"HS {lead_h4['hs4_code']}: {lead_h4['hs4_name'][:26]} ({fmt_eur(lead_h4['value_eur'])})", style={"fontSize": "11px", "color": TEXT_PRIMARY})
+                    ], className="mb-1")
+
             cards.append(dbc.Col([
                 html.Div([
                     html.Div([
@@ -1109,7 +1225,8 @@ def render_tab_resilience(selected_year):
                         get_concentration_badge(basket_hhi)
                     ], className="d-flex justify-content-between align-items-center mb-2"),
                     html.H4(fmt_eur(total_b_val), style={"fontWeight": "800", "color": PRIMARY, "marginBottom": "4px"}),
-                    html.P(info["desc"], className="text-muted", style={"fontSize": "11px", "marginBottom": "10px"}),
+                    html.P(info["desc"], className="text-muted", style={"fontSize": "11px", "marginBottom": "8px"}),
+                    top_hs4_div,
                     html.Div([
                         html.Span("Top Supplier: ", style={"fontSize": "12px", "color": TEXT_MUTED}),
                         html.Strong(f"{top_p_name} ({top_p_share:.1f}%)", style={"fontSize": "12px", "color": TEXT_PRIMARY})
@@ -1120,6 +1237,7 @@ def render_tab_resilience(selected_year):
                     ])
                 ], style=KPI_CARD_STYLE)
             ], md=4, sm=6, className="mb-3"))
+
 
     return html.Div([
         dbc.Row([
