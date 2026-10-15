@@ -124,16 +124,7 @@ def create_header():
                     ], md=4)
                 ], className="align-items-center")
             ], fluid=True, className="app-container-max")
-        ], className="app-header-main"),
-
-        html.Div([
-            dbc.Container([
-                html.Div([
-                    html.Span("STATEC HACKATHON 2026", className="substrip-badge"),
-                    html.Span("Interactive merchandise trade analytics and tariff line decomposition (HS2–CN8).", className="substrip-text"),
-                ], className="d-flex align-items-center")
-            ], fluid=True, className="app-container-max")
-        ], className="app-substrip")
+        ], className="app-header-main")
     ])
 
 
@@ -216,7 +207,7 @@ def create_navigation_boxes():
                 ], id="btn-mode-deepdive", className="nav-mode-btn", n_clicks=0),
             ], className="nav-mode-bar"),
 
-            # Sub-row: 4 Resilience Radar buttons (shown when Resilience Radar is active)
+            # Sub-row: 3 Resilience Radar buttons (shown when Resilience Radar is active)
             html.Div([
                 html.Button([
                     html.I(className="bi bi-shield-check me-1 text-warning"),
@@ -224,18 +215,13 @@ def create_navigation_boxes():
                 ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
 
                 html.Button([
-                    html.I(className="bi bi-graph-up me-1 text-primary"),
-                    "2. Macro Trajectory & Balances"
-                ], id="btn-tab-macro", className="nav-tab-btn", n_clicks=0),
-
-                html.Button([
                     html.I(className="bi bi-globe-europe-africa me-1 text-info"),
-                    "3. Geopolitical Origins"
+                    "2. Macro Trajectory & Geopolitical Origins"
                 ], id="btn-tab-geopolitics", className="nav-tab-btn", n_clicks=0),
 
                 html.Button([
                     html.I(className="bi bi-lightning-charge me-1 text-danger"),
-                    "4. Historical Shock Scenarios"
+                    "3. Historical Shock Scenarios"
                 ], id="btn-tab-stress", className="nav-tab-btn", n_clicks=0),
             ], id="nav-group-resilience", className="d-flex flex-wrap nav-subtabs-container"),
 
@@ -258,7 +244,7 @@ def create_navigation_boxes():
 
                 html.Button([
                     html.I(className="bi bi-list-nested me-1"),
-                    "Q4: Tariff Lines (HS2→CN8)"
+                    "Q4: Product Breakdown per Country"
                 ], id="btn-tab-q4-drilldown", className="nav-tab-btn", n_clicks=0),
 
                 html.Button([
@@ -291,13 +277,12 @@ app.layout = html.Div([
 
 # ── Active Tab Navigation Router ───────────────────────────────────────────
 ALL_TAB_BTNS = [
-    "btn-tab-resilience", "btn-tab-macro", "btn-tab-geopolitics", "btn-tab-stress",
+    "btn-tab-resilience", "btn-tab-geopolitics", "btn-tab-stress",
     "btn-tab-partners", "btn-tab-products", "btn-tab-q3-partners",
     "btn-tab-q4-drilldown", "btn-tab-benchmarks", "btn-tab-seasonality"
 ]
 TAB_ID_MAP = {
     "btn-tab-resilience": "tab-resilience",
-    "btn-tab-macro": "tab-macro",
     "btn-tab-geopolitics": "tab-geopolitics",
     "btn-tab-stress": "tab-stress",
     "btn-tab-partners": "tab-partners",
@@ -307,7 +292,7 @@ TAB_ID_MAP = {
     "btn-tab-benchmarks": "tab-benchmarks",
     "btn-tab-seasonality": "tab-seasonality"
 }
-RESILIENCE_TABS = ["tab-resilience", "tab-macro", "tab-geopolitics", "tab-stress"]
+RESILIENCE_TABS = ["tab-resilience", "tab-geopolitics", "tab-stress"]
 DEEPDIVE_TABS = ["tab-partners", "tab-products", "tab-q3-partners", "tab-q4-drilldown", "tab-benchmarks", "tab-seasonality"]
 
 
@@ -538,93 +523,65 @@ def render_tab_resilience(selected_year):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# TAB 2: MACROECONOMIC HEALTH & TRAJECTORY
+# TAB 2: MACROECONOMIC TRAJECTORY & GEOPOLITICAL ORIGINS
 # ───────────────────────────────────────────────────────────────────────────
 def render_tab_macro(selected_year):
-    kpis_df = load_overview_kpis()
-    if kpis_df.empty:
-        return html.Div("Macro data not available.")
-
-    fig_trajectory = go.Figure()
-    # Imports first (left / navy), Exports second (blue)
-    fig_trajectory.add_trace(go.Scatter(
-        x=kpis_df["year"], y=kpis_df["IMPORT"] / 1e9,
-        name="Imports", mode="lines+markers",
-        line=dict(color=SECONDARY, width=3),
-        marker=dict(size=6),
-        hovertemplate="Imports: €%{y:.2f}B (%{x})<extra></extra>"
-    ))
-    fig_trajectory.add_trace(go.Scatter(
-        x=kpis_df["year"], y=kpis_df["EXPORT"] / 1e9,
-        name="Exports", mode="lines+markers",
-        line=dict(color=PRIMARY, width=3),
-        marker=dict(size=6),
-        hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
-    ))
-    apply_plot_theme(fig_trajectory, title="25-Year Trajectory of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
-
-    colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
-    fig_balance = go.Figure(go.Bar(
-        x=kpis_df["year"], y=kpis_df["trade_balance_eur"] / 1e9,
-        marker_color=colors,
-        hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
-    ))
-    apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (€B)", y_title="Billion Euros (€B)", dtick_x=2)
-
-    fig_eu = go.Figure()
-    if "intra_eu_import_share_pct" in kpis_df.columns:
-        fig_eu.add_trace(go.Scatter(
-            x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
-            name="Intra-EU Import Share %", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
-        ))
-    if "intra_eu_export_share_pct" in kpis_df.columns:
-        fig_eu.add_trace(go.Scatter(
-            x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
-            name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
-        ))
-    apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
-    fig_eu.update_yaxes(range=[55, 95])
-
-    vol_growth_pct = 0.0
-    if not kpis_df.empty:
-        v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
-        v_sub = kpis_df[kpis_df["year"] == selected_year]
-        v_end = v_sub["trade_volume_eur"].iloc[0] if not v_sub.empty else kpis_df["trade_volume_eur"].iloc[-1]
-        vol_growth_pct = ((v_end / v_start) - 1.0) * 100 if v_start > 0 else 0.0
-
-    return html.Div([
-        create_section_header(
-            f"MACROECONOMIC TRAJECTORY & TRADE BALANCE (2000–2026)",
-            f"Long-term merchandise trade volume growth ({vol_growth_pct:+.1f}% vs baseline {kpis_df['year'].min() if not kpis_df.empty else 2000}), trade balance evolution, and EU Single Market integration.",
-            badge_text="Macro Overview",
-            badge_color=STATEC_NAVY
-        ),
-
-        dbc.Row([
-            dbc.Col([
-                html.Div([dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})], className="dash-card")
-            ], md=8),
-            dbc.Col([
-                html.Div([dcc.Graph(figure=fig_balance, config={"displayModeBar": False})], className="dash-card")
-            ], md=4),
-        ]),
-
-        dbc.Row([
-            dbc.Col([
-                html.Div([dcc.Graph(figure=fig_eu, config={"displayModeBar": False})], className="dash-card")
-            ], md=12)
-        ])
-    ])
+    return render_tab_geopolitics(selected_year)
 
 
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 3: GEOPOLITICAL EXPOSURE & SEASONAL SHOCKS
-# ───────────────────────────────────────────────────────────────────────────
 def render_tab_geopolitics(selected_year):
+    kpis_df = load_overview_kpis()
     partners_df = load_partner_rankings()
-    if partners_df.empty:
-        return html.Div("Geopolitical data not available.")
+    if kpis_df.empty and partners_df.empty:
+        return html.Div("Macro & Geopolitical data not available.")
 
+    # 1. 25-Year Trajectory
+    fig_trajectory = go.Figure()
+    if not kpis_df.empty:
+        fig_trajectory.add_trace(go.Scatter(
+            x=kpis_df["year"], y=kpis_df["IMPORT"] / 1e9,
+            name="Imports", mode="lines+markers",
+            line=dict(color=SECONDARY, width=3),
+            marker=dict(size=6),
+            hovertemplate="Imports: €%{y:.2f}B (%{x})<extra></extra>"
+        ))
+        fig_trajectory.add_trace(go.Scatter(
+            x=kpis_df["year"], y=kpis_df["EXPORT"] / 1e9,
+            name="Exports", mode="lines+markers",
+            line=dict(color=PRIMARY, width=3),
+            marker=dict(size=6),
+            hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
+        ))
+        apply_plot_theme(fig_trajectory, title="25-Year Trajectory of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
+
+        # 2. Trade Balance
+        colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
+        fig_balance = go.Figure(go.Bar(
+            x=kpis_df["year"], y=kpis_df["trade_balance_eur"] / 1e9,
+            marker_color=colors,
+            hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
+        ))
+        apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (€B)", y_title="Billion Euros (€B)", dtick_x=2)
+
+        # 3. EU Integration Share
+        fig_eu = go.Figure()
+        if "intra_eu_import_share_pct" in kpis_df.columns:
+            fig_eu.add_trace(go.Scatter(
+                x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
+                name="Intra-EU Import Share %", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
+            ))
+        if "intra_eu_export_share_pct" in kpis_df.columns:
+            fig_eu.add_trace(go.Scatter(
+                x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
+                name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
+            ))
+        apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
+        fig_eu.update_yaxes(range=[55, 95])
+        fig_eu.update_layout(margin=dict(l=10, r=20, t=35, b=30))
+    else:
+        fig_trajectory, fig_balance, fig_eu = go.Figure(), go.Figure(), go.Figure()
+
+    # 4. Regional Origin Donut & Non-EU Suppliers
     sub = partners_df[(partners_df["year"] == selected_year) & (partners_df["flow"] == "IMPORT")].copy()
     if sub.empty:
         sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
@@ -641,17 +598,7 @@ def render_tab_geopolitics(selected_year):
     row_share = (row_val / tot_imp * 100) if tot_imp > 0 else 0.0
 
     non_eu_sub = sub[~sub['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8).copy()
-
-    def assign_geo_tier(code):
-        if code in neighbors:
-            return f"Direct Neighbors ({neigh_share:.1f}% of Goods)"
-        elif code in eu_codes:
-            return f"EU Single Market Partners ({other_eu_share:.1f}%)"
-        elif code in non_eu_sub["partner_code"].values:
-            return "Strategic Non-EU Suppliers"
-        return "Other Partners"
-
-    sub["geo_tier"] = sub["partner_code"].apply(assign_geo_tier)
+    non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
 
     fig_donut = go.Figure(go.Pie(
         labels=[
@@ -667,13 +614,11 @@ def render_tab_geopolitics(selected_year):
     ))
     fig_donut.update_layout(
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=30, b=20),
-        font=dict(family="Inter, sans-serif", size=12, color=TEXT_PRIMARY),
+        margin=dict(l=15, r=15, t=30, b=15),
+        font=dict(family="Inter, sans-serif", size=11, color=TEXT_PRIMARY),
         showlegend=False
     )
 
-    non_eu_sub = sub[~sub['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8).copy()
-    non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
     fig_non_eu = go.Figure(go.Bar(
         x=non_eu_sub['value_eur'] / 1e6,
         y=non_eu_sub['name_en'],
@@ -684,30 +629,53 @@ def render_tab_geopolitics(selected_year):
         hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
     ))
     apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
-    fig_non_eu.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
+    fig_non_eu.update_layout(margin=dict(l=10, r=35, t=35, b=30), yaxis=dict(autorange="reversed"))
 
-    # Note: Seasonal flows are analyzed in depth in Q6 Seasonality Lab
+    vol_growth_pct = 0.0
+    if not kpis_df.empty:
+        v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
+        v_sub = kpis_df[kpis_df["year"] == selected_year]
+        v_end = v_sub["trade_volume_eur"].iloc[0] if not v_sub.empty else kpis_df["trade_volume_eur"].iloc[-1]
+        vol_growth_pct = ((v_end / v_start) - 1.0) * 100 if v_start > 0 else 0.0
+
     return html.Div([
         create_section_header(
-            f"GEOPOLITICAL ORIGINS & REGIONAL EXPOSURE ({selected_year})",
-            "Geographic distribution of merchandise imports (EU vs Non-EU partners) and strategic third-country supplier exposure.",
-            badge_text="Origins & Partners",
+            f"MACRO TRAJECTORY & GEOPOLITICAL ORIGINS ({selected_year})",
+            f"25-Year merchandise trade trajectory ({vol_growth_pct:+.1f}% volume growth vs 2000), trade balance evolution, EU Single Market integration, and third-country supplier exposure.",
+            badge_text="Macro & Geopolitics",
             badge_color=STATEC_NAVY
         ),
 
+        # Row 1: Macro Trajectory & Trade Balance
+        dbc.Row([
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})], className="dash-card")
+            ], md=8),
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_balance, config={"displayModeBar": False})], className="dash-card")
+            ], md=4),
+        ]),
+
+        # Row 2: Origin Donut, Non-EU Suppliers, and EU Integration Line Chart
         dbc.Row([
             dbc.Col([
                 html.Div([
                     html.H6("REGIONAL IMPORT ORIGIN EXPOSURE", className="card-title-upper"),
-                    dcc.Graph(figure=fig_donut, config={"displayModeBar": False}, className="chart-h-380")
+                    dcc.Graph(figure=fig_donut, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
-            ], md=5),
+            ], md=4),
 
             dbc.Col([
                 html.Div([
-                    dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False}, className="chart-h-380")
+                    dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
-            ], md=7),
+            ], md=4),
+
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(figure=fig_eu, config={"displayModeBar": False}, className="chart-h-340")
+                ], className="dash-card")
+            ], md=4),
         ])
     ])
 
@@ -940,9 +908,7 @@ def render_tab_partners(selected_year):
     return html.Div([
         create_section_header(
             f"Q1: TRADING PARTNERS & BILATERAL FLOWS ({selected_year})",
-            "Who are Luxembourg's main trading partners? How have they evolved over time? Click any country bar below to instantly inspect top products traded with that country.",
-            badge_text="Research Question Q1",
-            badge_color=STATEC_BLUE
+            "Who are Luxembourg's main trading partners? How have they evolved over time? Click any country bar below to instantly inspect top products traded with that country."
         ),
 
         # Controls Ribbon (Imports always on left & default)
@@ -963,24 +929,7 @@ def render_tab_partners(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
                     )
-                ], md=4, sm=6, className="mb-2 mb-md-0"),
-
-                dbc.Col([
-                    html.Label("GEOGRAPHIC SCOPE:", className="control-label"),
-                    dbc.RadioItems(
-                        id="q1-scope-radio",
-                        options=[
-                            {"label": "World", "value": "world"},
-                            {"label": "Europe (EU-27)", "value": "europe"},
-                        ],
-                        value="world",
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
-                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
-                    )
-                ], md=3, sm=6, className="mb-2 mb-md-0"),
+                ], md=6, sm=6),
 
                 dbc.Col([
                     html.Label("METRIC:", className="control-label"),
@@ -997,18 +946,7 @@ def render_tab_partners(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
                     )
-                ], md=3, sm=6),
-
-                dbc.Col([
-                    html.Label("MAP SIZE:", className="control-label"),
-                    dbc.Button(
-                        [html.I(className="bi bi-arrows-fullscreen me-1"), "Toggle Map Size"],
-                        id="q1-map-toggle-btn",
-                        color="light",
-                        size="sm",
-                        className="border fw-bold d-block w-100 small",
-                    )
-                ], md=2, sm=6)
+                ], md=6, sm=6),
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1032,14 +970,39 @@ def render_tab_partners(selected_year):
             ], md=5)
         ]),
 
-        # Map Row (Compact by default, expandable on demand)
+        # Map Row (With Geographic Scope and Map Size controls right beside the map header)
         dbc.Row([
             dbc.Col([
                 html.Div([
                     html.Div([
-                        html.H6("GLOBAL GEOGRAPHIC FLOW MAP", className="card-title-upper mb-0"),
-                        html.Small("Hover to view country trade volume • Click to select", className="kpi-caption")
-                    ], className="d-flex justify-content-between align-items-center mb-1"),
+                        html.Div([
+                            html.H6("GLOBAL GEOGRAPHIC FLOW MAP", className="card-title-upper mb-0"),
+                            html.Small("Hover to view country trade volume • Click to select", className="kpi-caption")
+                        ]),
+                        html.Div([
+                            html.Label("SCOPE:", className="control-label me-2 mb-0 d-none d-sm-inline"),
+                            dbc.RadioItems(
+                                id="q1-scope-radio",
+                                options=[
+                                    {"label": "World", "value": "world"},
+                                    {"label": "Europe (EU-27)", "value": "europe"},
+                                ],
+                                value="world",
+                                inline=True,
+                                className="btn-group me-2",
+                                input_class_name="btn-check",
+                                label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
+                                label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
+                            ),
+                            dbc.Button(
+                                [html.I(className="bi bi-arrows-fullscreen me-1"), "Toggle Map Size"],
+                                id="q1-map-toggle-btn",
+                                color="light",
+                                size="sm",
+                                className="border fw-bold small",
+                            )
+                        ], className="d-flex align-items-center")
+                    ], className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"),
                     dcc.Graph(id="q1-world-map", config={"displayModeBar": False})
                 ], className="dash-card")
             ], md=12)
@@ -1241,9 +1204,7 @@ def render_tab_products(selected_year):
     return html.Div([
         create_section_header(
             f"Q2: MAIN PRODUCT CATEGORIES & STRUCTURAL SHIFT ({selected_year})",
-            "What are the main categories of goods traded? How have these patterns transformed over 25 years (from steel dominance to advanced automotive, machinery, and pharma)? Click any product bar to see its top partner countries.",
-            badge_text="Research Question Q2",
-            badge_color=STATEC_BLUE
+            "What are the main categories of goods traded? How have these patterns transformed over 25 years (from steel dominance to advanced automotive, machinery, and pharma)? Click any product bar to see its top partner countries."
         ),
 
         html.Div([
@@ -1305,7 +1266,7 @@ def render_tab_products(selected_year):
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6("25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT EXPORTS (2000–2025)", className="card-title-upper"),
+                    html.H6(id="q2-shift-chart-title", className="card-title-upper"),
                     dcc.Graph(id="q2-shift-chart", config={"displayModeBar": False}, className="chart-h-300")
                 ], className="dash-card")
             ], md=12)
@@ -1353,6 +1314,7 @@ def update_q2_selected_product(bar_click, flow, granularity, year, current_prod)
     Output("q2-barchart-title", "children"),
     Output("q2-top-products-bar", "figure"),
     Output("q2-shift-chart", "figure"),
+    Output("q2-shift-chart-title", "children"),
     Input("q2-flow-radio", "value"),
     Input("q2-granularity-radio", "value"),
     Input("q2-selected-product", "data"),
@@ -1391,10 +1353,17 @@ def update_q2_charts(flow, granularity, selected_prod, year):
     apply_plot_theme(fig_bar, x_title="Million Euros (€M)")
     fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    # Structural shift chart (Iron/Steel 72 vs Machinery 84 vs Vehicles 87 vs Plastics 39)
+    # Structural shift chart: dynamically track top 5 product categories for this flow in the selected year
     all_prod = load_product_rankings()
-    key_chs = ["72", "84", "87", "39", "30"]
-    ch_names = {"72": "Iron & Steel (72)", "84": "Machinery (84)", "87": "Vehicles (87)", "39": "Plastics (39)", "30": "Pharma (30)"}
+    sub_yr = all_prod[(all_prod["year"] == year) & (all_prod["flow"] == flow)].sort_values("value_eur", ascending=False)
+    if not sub_yr.empty:
+        top5_chs = sub_yr.head(5)
+        key_chs = top5_chs["hs2_code"].tolist()
+        ch_names = {r["hs2_code"]: f"{r['hs2_name'][:20]} ({r['hs2_code']})" for _, r in top5_chs.iterrows()}
+    else:
+        key_chs = ["72", "84", "87", "39", "30"]
+        ch_names = {"72": "Iron & Steel (72)", "84": "Machinery (84)", "87": "Vehicles (87)", "39": "Plastics (39)", "30": "Pharma (30)"}
+
     fig_shift = go.Figure()
     for ch in key_chs:
         c_sub = all_prod[(all_prod["hs2_code"] == ch) & (all_prod["flow"] == flow)].sort_values("year")
@@ -1410,8 +1379,9 @@ def update_q2_charts(flow, granularity, selected_prod, year):
     apply_plot_theme(fig_shift, title=f"25-Year Sector Evolution ({flow.capitalize()}) (€M)", y_title="Million Euros (€M)")
     fig_shift.update_layout(margin=dict(l=10, r=20, t=30, b=30))
 
-    title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}"
-    return title, fig_bar, fig_shift
+    barchart_title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}"
+    shift_title = f"25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT {flow.upper()}S (2000–2025)"
+    return barchart_title, fig_bar, fig_shift, shift_title
 
 
 @callback(
@@ -1447,7 +1417,16 @@ def update_q2_spotlight_panel(prod_code, flow, year):
     else:
         top_suppliers.append(html.P("Supplier breakdown not available.", className="text-muted small"))
 
-    hhi_score = (sub["supplier_share_pct"] ** 2).sum() if ("supplier_share_pct" in sub.columns and not sub.empty) else 0
+    if not sub.empty:
+        if "hhi" in sub.columns and pd.notna(sub["hhi"].iloc[0]):
+            hhi_score = float(sub["hhi"].iloc[0])
+        elif tot_val > 0:
+            shares = (sub["value_eur"] / tot_val) * 100
+            hhi_score = float((shares ** 2).sum())
+        else:
+            hhi_score = 0.0
+    else:
+        hhi_score = 0.0
 
     return html.Div([
         html.Div([
@@ -1490,9 +1469,7 @@ def render_tab_q3_product_partners(selected_year):
     return html.Div([
         create_section_header(
             f"Q3: PRINCIPAL PARTNERS BY PRODUCT CATEGORY ({selected_year})",
-            "For a given product category, who are Luxembourg's principal trading partners? Inspect supplier concentration (HHI) and geographic origin breakdown.",
-            badge_text="Research Question Q3",
-            badge_color=STATEC_BLUE
+            "For a given product category, who are Luxembourg's principal trading partners? Inspect supplier concentration (HHI) and geographic origin breakdown."
         ),
 
         html.Div([
@@ -1611,10 +1588,8 @@ def render_tab_q4_drilldown(selected_year):
 
     return html.Div([
         create_section_header(
-            f"Q4: PARTNER TARIFF LINES DRILL-DOWN (HS2 → HS4 → CN8) ({selected_year})",
-            "For a given partner country, what are the main goods traded? Displays increasingly detailed levels of information (up to 8-digit CN8 codes) with a significance threshold filter to eliminate minor noise and confidential cells.",
-            badge_text="Research Question Q4",
-            badge_color=STATEC_BLUE
+            f"Q4: PRODUCT BREAKDOWN PER COUNTRY ({selected_year})",
+            "For a given partner country, what are the main goods traded? Displays granular product breakdowns across HS2 Chapters, HS4 Subheadings, and 8-digit CN8 tariff lines."
         ),
 
         html.Div([
@@ -1801,9 +1776,7 @@ def render_tab_benchmarks(selected_year):
     return html.Div([
         create_section_header(
             f"Q5: REGIONAL PEER BENCHMARKING ({selected_year})",
-            "How does Luxembourg's trade compare with neighboring economies (Germany, France, Belgium, Netherlands)? Volume expansion indices and structural coverage ratio asymmetries.",
-            badge_text="Research Question Q5",
-            badge_color=STATEC_BLUE
+            "How does Luxembourg's trade compare with neighboring economies (Germany, France, Belgium, Netherlands)? Volume expansion indices and structural coverage ratio asymmetries."
         ),
 
         dbc.Row([
@@ -1828,12 +1801,18 @@ def render_tab_seasonality():
         options = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
     def_p = "TOTAL" if any(o["value"] == "TOTAL" for o in options) else (options[0]["value"] if options else "TOTAL")
 
+def render_tab_seasonality():
+    sea_df = load_seasonal_decomposition()
+    options = []
+    if not sea_df.empty:
+        u = sea_df[["product_code", "product_name"]].drop_duplicates().sort_values("product_code")
+        options = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
+    def_p = "TOTAL" if any(o["value"] == "TOTAL" for o in options) else (options[0]["value"] if options else "TOTAL")
+
     return html.Div([
         create_section_header(
             "Q6: ECONOMETRIC SEASONALITY & TREND LAB",
-            "Do Luxembourg's trade flows exhibit specific seasonal patterns? Decomposes monthly trade into raw observed series, 12-month centered rolling trends, and seasonally adjusted series.",
-            badge_text="Research Question Q6",
-            badge_color=STATEC_BLUE
+            "Do Luxembourg's trade flows exhibit specific seasonal patterns? Decomposes monthly trade into raw observed series, 12-month centered rolling trends, and seasonally adjusted series."
         ),
 
         html.Div([
@@ -1856,6 +1835,7 @@ def render_tab_seasonality():
                         options=[
                             {"label": "Imports", "value": "IMPORT"},
                             {"label": "Exports", "value": "EXPORT"},
+                            {"label": "Trade Balance", "value": "BALANCE"},
                         ],
                         value="IMPORT",
                         inline=True,
@@ -1908,15 +1888,29 @@ def render_tab_seasonality():
 )
 def update_seasonality_charts(product, flow, selected_series):
     sea_df = load_seasonal_decomposition()
-    sub = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == flow)].sort_values("date").copy()
-    if sub.empty:
-        return go.Figure(), go.Figure()
+    if flow == "BALANCE":
+        imp = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == "IMPORT")].sort_values("date").copy()
+        exp = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == "EXPORT")].sort_values("date").copy()
+        if imp.empty or exp.empty:
+            return go.Figure(), go.Figure()
+        sub = pd.merge(exp[["date", "month", "product_code", "product_name", "value_eur", "trend_eur", "seasonally_adjusted_eur"]],
+                       imp[["date", "value_eur", "trend_eur", "seasonally_adjusted_eur"]],
+                       on="date", suffixes=("_exp", "_imp"))
+        sub["value_eur"] = sub["value_eur_exp"] - sub["value_eur_imp"]
+        sub["trend_eur"] = sub["trend_eur_exp"] - sub["trend_eur_imp"]
+        sub["seasonally_adjusted_eur"] = sub["seasonally_adjusted_eur_exp"] - sub["seasonally_adjusted_eur_imp"]
+        sub["seasonal_dev_eur"] = sub["value_eur"] - sub["trend_eur"]
+    else:
+        sub = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == flow)].sort_values("date").copy()
+        if sub.empty:
+            return go.Figure(), go.Figure()
 
     fig_ts = go.Figure()
+    flow_lbl = "Trade Balance" if flow == "BALANCE" else flow.capitalize()
     if "raw" in selected_series:
         fig_ts.add_trace(go.Scatter(
             x=sub["date"], y=sub["value_eur"] / 1e6,
-            name="Raw Observed", mode="lines",
+            name=f"Raw Observed {flow_lbl}", mode="lines",
             line=dict(color="#94A3B8", width=1.5),
             hovertemplate="%{x}: €%{y:,.1f}M<extra></extra>"
         ))
@@ -1934,27 +1928,46 @@ def update_seasonality_charts(product, flow, selected_series):
             line=dict(color=SUCCESS, width=2, dash="dot"),
             hovertemplate="%{x}: SA €%{y:,.1f}M<extra></extra>"
         ))
-    apply_plot_theme(fig_ts, title=f"Monthly Trade Timeseries ({sub['product_name'].iloc[0]}) (€M)", y_title="Million Euros (€M)", hovermode="x unified")
+    prod_name_disp = sub['product_name'].iloc[0] if 'product_name' in sub.columns else f"Product {product}"
+    apply_plot_theme(fig_ts, title=f"Monthly {flow_lbl} Timeseries ({prod_name_disp}) (€M)", y_title="Million Euros (€M)", hovermode="x unified")
     fig_ts.update_layout(margin=dict(l=10, r=20, t=35, b=30))
 
     # Factors chart
-    factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
-    colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else STATEC_BLUE) for m, f in zip(factors["month"], factors["seasonal_factor"])]
-    fig_factors = go.Figure(go.Bar(
-        x=factors["month_name"],
-        y=(factors["seasonal_factor"] - 1.0) * 100,
-        marker_color=colors,
-        text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
-        textposition="outside",
-        hovertemplate="%{x}: %{text}<extra></extra>"
-    ))
-    apply_plot_theme(fig_factors, title="Seasonal Factors (% vs Annual Trend)", y_title="% vs Annual Trend")
-    # Legend traces for seasonal factor color categories
-    fig_factors.add_trace(go.Bar(name="Peak Month (> +5%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
-    fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
-    fig_factors.add_trace(go.Bar(name="August Slump", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+    if flow == "BALANCE":
+        factors = sub.groupby("month")["seasonal_dev_eur"].mean().reset_index()
+        factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
+        dev_m = factors["seasonal_dev_eur"] / 1e6
+        colors = [SUCCESS if v > 15 else (DANGER if v < -15 else STATEC_BLUE) for v in dev_m]
+        fig_factors = go.Figure(go.Bar(
+            x=factors["month_name"],
+            y=dev_m,
+            marker_color=colors,
+            text=[f"{v:+.1f}M" for v in dev_m],
+            textposition="outside",
+            hovertemplate="%{x}: Deviation %{text}<extra></extra>"
+        ))
+        apply_plot_theme(fig_factors, title="Trade Balance Monthly Seasonal Deviation (€M vs Trend)", y_title="Deviation vs Trend (€M)")
+        fig_factors.add_trace(go.Bar(name="Deficit Narrowing (> +€15M)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
+        fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
+        fig_factors.add_trace(go.Bar(name="Deficit Widening (< -€15M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+    else:
+        factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
+        factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
+        colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else STATEC_BLUE) for m, f in zip(factors["month"], factors["seasonal_factor"])]
+        fig_factors = go.Figure(go.Bar(
+            x=factors["month_name"],
+            y=(factors["seasonal_factor"] - 1.0) * 100,
+            marker_color=colors,
+            text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
+            textposition="outside",
+            hovertemplate="%{x}: %{text}<extra></extra>"
+        ))
+        apply_plot_theme(fig_factors, title=f"{flow_lbl} Seasonal Factors (% vs Annual Trend)", y_title="% vs Annual Trend")
+        fig_factors.add_trace(go.Bar(name="Peak Month (> +5%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
+        fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
+        fig_factors.add_trace(go.Bar(name="August Slump", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+
     fig_factors.update_layout(
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
