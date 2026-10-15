@@ -1,0 +1,855 @@
+/* ==========================================================================
+   STATEC HACKATHON 2026 - STREAMLINED DASHBOARD STYLESHEET
+   Unified Design System Tokens, Tables, Cards, Controls, and Hover Popovers
+   ========================================================================== */
+
+:root {
+    --statec-navy: #001A38;
+    --statec-yellow: #FFC800;
+    --statec-blue: #0066B2;
+    --statec-red: #EA152C;
+    --statec-gray: #556987;
+    --statec-bg: #F4F6F9;
+    --statec-surface: #FFFFFF;
+    --statec-border: #E2E8F0;
+    --statec-success: #059669;
+}
+
+/* Global Typography & Base Elements */
+body {
+    background-color: var(--statec-bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--statec-navy);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+strong, b, .strong-text {
+    font-weight: 700;
+    color: var(--statec-navy);
+}
+
+.text-muted-custom {
+    color: var(--statec-gray) !important;
+}
+
+/* --------------------------------------------------------------------------
+   App Header & Banner
+   -------------------------------------------------------------------------- */
+.app-header-main {
+    background-color: #FFFFFF;
+    border-bottom: 1px solid var(--statec-border);
+}
+
+.brand-logo {
+    font-size: 22px;
+    font-weight: 900;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-navy);
+    line-height: 1;
+}
+
+.brand-accent {
+    font-size: 22px;
+    font-weight: 900;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-yellow);
+    line-height: 1;
+}
+
+.brand-subtitle {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    color: var(--statec-gray);
+    display: block;
+    margin-top: -2px;
+}
+
+.brand-divider {
+    width: 1px;
+    height: 32px;
+    background-color: #CBD5E1;
+    margin: 0 18px;
+}
+
+.portal-title {
+    font-size: 15px;
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-navy);
+    display: block;
+    line-height: 1.2;
+}
+
+.portal-subtitle {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--statec-gray);
+    display: block;
+}
+
+.header-filter-label {
+    font-size: 10px;
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-navy);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.header-year-dropdown {
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 6px;
+    min-width: 105px;
+}
+
+.app-substrip {
+    background-color: var(--statec-navy);
+    padding: 5px 0;
+    margin-bottom: 16px;
+    border-bottom: 2.5px solid var(--statec-yellow);
+}
+
+.substrip-badge {
+    background-color: var(--statec-yellow);
+    color: var(--statec-navy);
+    font-weight: 800;
+    font-size: 9.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 10px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.substrip-text {
+    color: #E2E8F0;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   Top Mode Navigation (Resilience Radar vs Deep-Dive)
+   -------------------------------------------------------------------------- */
+.nav-mode-container {
+    background-color: #FFFFFF;
+    border-radius: 10px;
+    border: 1px solid var(--statec-border);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0, 26, 56, 0.04);
+}
+
+.nav-mode-bar {
+    display: inline-flex;
+    background-color: #F1F5F9;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 4px;
+}
+
+.nav-mode-btn {
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    padding: 8px 22px;
+    margin: 0 2px;
+    transition: all 0.15s ease-in-out;
+    border: 1px solid transparent;
+    background-color: transparent;
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+}
+
+.nav-mode-btn:hover {
+    color: var(--statec-navy);
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.nav-mode-btn.active {
+    background-color: var(--statec-navy) !important;
+    color: #FFFFFF !important;
+    border-color: var(--statec-navy) !important;
+    border-bottom: 2.5px solid var(--statec-yellow) !important;
+    box-shadow: 0 2px 8px rgba(0, 26, 56, 0.22);
+}
+
+.nav-subtabs-container {
+    border-top: 1px solid #F1F5F9;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Legacy Box Cards (fallback)
+   -------------------------------------------------------------------------- */
+.nav-box-card {
+    background-color: #FFFFFF;
+    border-radius: 10px;
+    border: 1px solid var(--statec-border);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0, 26, 56, 0.04);
+}
+
+.border-accent-gold {
+    border-left: 4px solid var(--statec-yellow) !important;
+}
+
+.border-accent-blue {
+    border-left: 4px solid var(--statec-blue) !important;
+}
+
+.nav-box-title {
+    font-size: 11.5px;
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-navy);
+    letter-spacing: 0.6px;
+    margin-left: 8px;
+}
+
+.nav-box-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.badge-navy {
+    background-color: var(--statec-navy);
+    color: var(--statec-yellow);
+}
+
+.badge-blue {
+    background-color: #EFF6FF;
+    color: var(--statec-blue);
+    border: 1px solid #BFDBFE;
+}
+
+.nav-tab-btn {
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'Montserrat', sans-serif;
+    padding: 7px 13px;
+    margin: 3px 4px;
+    transition: all 0.15s ease-in-out;
+    border: 1px solid var(--statec-border);
+    background-color: #FFFFFF;
+    color: var(--statec-navy);
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    user-select: none;
+}
+
+.nav-tab-btn:hover {
+    background-color: #F8FAFC;
+    border-color: #94A3B8;
+    color: var(--statec-blue);
+}
+
+.nav-tab-btn.active {
+    background-color: var(--statec-navy) !important;
+    color: #FFFFFF !important;
+    border-color: var(--statec-navy) !important;
+    border-bottom: 3px solid var(--statec-yellow) !important;
+    box-shadow: 0 2px 8px rgba(0, 26, 56, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Section Headers
+   -------------------------------------------------------------------------- */
+.section-header-box {
+    margin-bottom: 16px;
+}
+
+.section-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    color: var(--statec-navy);
+    margin: 0;
+    letter-spacing: 0.4px;
+}
+
+.section-subtitle {
+    font-size: 12.5px;
+    color: var(--statec-gray);
+    margin: 4px 0 0 0;
+    line-height: 1.5;
+}
+
+.section-badge {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 10.5px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    margin-left: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Compact KPI Ribbon Tiles
+   -------------------------------------------------------------------------- */
+.compact-kpi-tile {
+    background-color: #FFFFFF;
+    border: 1px solid var(--statec-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 1px 3px rgba(0, 26, 56, 0.03);
+    height: 100%;
+}
+
+.kpi-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--statec-gray);
+    letter-spacing: 0.4px;
+    display: block;
+    text-transform: uppercase;
+}
+
+.kpi-val {
+    font-weight: 800;
+    margin: 1px 0;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.kpi-val-navy {
+    color: var(--statec-navy);
+}
+
+.kpi-val-blue {
+    color: var(--statec-blue);
+}
+
+.kpi-val-danger {
+    color: var(--statec-red);
+}
+
+.kpi-val-success {
+    color: var(--statec-success);
+}
+
+.kpi-val-warning {
+    color: #D97706;
+}
+
+.kpi-caption {
+    font-size: 10px;
+    color: var(--statec-gray);
+    display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Unified Card Containers
+   -------------------------------------------------------------------------- */
+.dash-card {
+    background-color: #FFFFFF;
+    border: 1px solid var(--statec-border);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0, 26, 56, 0.04);
+    margin-bottom: 16px;
+}
+
+.dash-kpi-card {
+    background-color: #FFFFFF;
+    border: 1px solid var(--statec-border);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 26, 56, 0.04);
+    height: 100%;
+}
+
+.spotlight-card {
+    background-color: #FFFFFF;
+    border: 1px solid var(--statec-border);
+    border-left: 4px solid var(--statec-yellow);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgba(0, 26, 56, 0.04);
+    margin-bottom: 16px;
+}
+
+.notice-card {
+    background-color: #F8FAFC;
+    border: 1px solid var(--statec-border);
+    border-left: 4px solid var(--statec-yellow);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0, 26, 56, 0.03);
+    margin-bottom: 16px;
+}
+
+.card-title-upper {
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-navy);
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Streamlined Table Styling (Matches all tables, rows, and headers)
+   -------------------------------------------------------------------------- */
+.table-custom-wrapper {
+    overflow-x: auto;
+}
+
+table.table {
+    width: 100%;
+    margin-bottom: 0;
+    font-size: 12px;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--statec-navy);
+}
+
+table.table thead th {
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--statec-gray);
+    background-color: #F8FAFC;
+    border-bottom: 2px solid var(--statec-border);
+    padding: 9px 12px;
+    vertical-align: middle;
+}
+
+table.table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--statec-border);
+    vertical-align: middle;
+    font-size: 12px;
+}
+
+table.table tbody tr:hover {
+    background-color: #F8FAFC;
+}
+
+table.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* --------------------------------------------------------------------------
+   Form Controls, Ribbons & Inputs
+   -------------------------------------------------------------------------- */
+.control-ribbon {
+    background-color: #FFFFFF;
+    border: 1px solid var(--statec-border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0, 26, 56, 0.04);
+}
+
+.control-label {
+    font-weight: 800;
+    font-size: 11px;
+    color: var(--statec-navy);
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.btn-check:checked + .btn-outline-secondary {
+    background-color: var(--statec-navy) !important;
+    color: #FFFFFF !important;
+    border-color: var(--statec-navy) !important;
+    font-weight: 700;
+}
+
+.btn-check:checked + .btn-outline-primary {
+    background-color: var(--statec-blue) !important;
+    color: #FFFFFF !important;
+    border-color: var(--statec-blue) !important;
+    font-weight: 700;
+}
+
+.btn-check:checked + .btn-outline-dark {
+    background-color: var(--statec-navy) !important;
+    color: #FFFFFF !important;
+    border-color: var(--statec-navy) !important;
+    font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Spotlight Progress Bars
+   -------------------------------------------------------------------------- */
+.spotlight-bar-track {
+    background-color: #E2E8F0;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin: 4px 0 8px 0;
+}
+
+.spotlight-bar-fill {
+    background-color: var(--statec-blue);
+    height: 100%;
+    border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Interactive Hover Infobox Popovers
+   -------------------------------------------------------------------------- */
+.info-hover-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.info-hover-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: #EDF2F7;
+    color: var(--statec-navy);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1.5px solid #CBD5E1;
+    margin-left: 8px;
+    line-height: 1;
+    user-select: none;
+}
+
+.info-hover-wrapper:hover .info-hover-icon,
+.info-hover-icon:hover {
+    background-color: var(--statec-yellow) !important;
+    color: var(--statec-navy) !important;
+    border-color: #D9A700 !important;
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(255, 200, 0, 0.45);
+}
+
+.info-hover-card {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 450px;
+    max-width: 88vw;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-left: 4px solid var(--statec-yellow);
+    border-radius: 8px;
+    box-shadow: 0 14px 32px rgba(0, 26, 56, 0.22), 0 4px 12px rgba(0, 26, 56, 0.1);
+    padding: 14px 16px;
+    z-index: 999999;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
+    transform: translateY(6px);
+    pointer-events: none;
+    text-align: left;
+    white-space: normal;
+}
+
+.info-hover-align-right .info-hover-card {
+    left: auto;
+    right: 0;
+}
+
+.info-hover-wrapper:hover .info-hover-card,
+.info-hover-card:hover {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.info-hover-card::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 18px;
+    width: 10px;
+    height: 10px;
+    background: #FFFFFF;
+    border-left: 1px solid #CBD5E1;
+    border-top: 1px solid #CBD5E1;
+    transform: rotate(45deg);
+}
+
+.info-hover-align-right .info-hover-card::before {
+    left: auto;
+    right: 18px;
+}
+
+.info-hover-text {
+    text-decoration: underline dotted var(--statec-blue) 1.5px;
+    text-underline-offset: 3px;
+    cursor: help;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    color: inherit;
+    font-weight: 600;
+}
+
+.info-hover-text:hover {
+    color: var(--statec-blue);
+}
+
+/* --------------------------------------------------------------------------
+   Institutional Footer & Badges
+   -------------------------------------------------------------------------- */
+.app-footer {
+    background-color: var(--statec-navy);
+    margin-top: 60px;
+    color: #FFFFFF;
+    border-top: 3px solid var(--statec-yellow);
+}
+
+.footer-inner {
+    max-width: 1540px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+.footer-logo-title {
+    font-size: 20px;
+    font-weight: 900;
+    font-family: 'Montserrat', sans-serif;
+    color: #FFFFFF;
+    letter-spacing: -0.5px;
+}
+
+.footer-logo-accent {
+    font-size: 20px;
+    font-weight: 900;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--statec-yellow);
+}
+
+.footer-logo-sub {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #94A3B8;
+    display: block;
+    margin-top: 2px;
+}
+
+.footer-source-text {
+    font-size: 11.5px;
+    color: #CBD5E1;
+    display: block;
+}
+
+.footer-proto-text {
+    font-size: 10.5px;
+    color: #94A3B8;
+    display: block;
+    margin-top: 2px;
+}
+
+.app-disclaimer-bar {
+    font-size: 10.5px;
+    color: #94A3B8;
+    margin: 0;
+    text-align: center;
+    padding: 12px 15px;
+    background-color: #001226;
+    line-height: 1.5;
+}
+
+/* Icon Badges & Accents */
+.icon-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background-color: rgba(0, 26, 56, 0.05);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.title-accent-bar {
+    width: 42px;
+    height: 4px;
+    background-color: var(--statec-yellow);
+    border-radius: 2px;
+    margin-bottom: 12px;
+}
+
+/* Concentration Badges */
+.badge-concentration-high {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 11px;
+    border: 1px solid #FCA5A5;
+}
+
+.badge-concentration-mid {
+    background-color: #FEF3C7;
+    color: #B45309;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 11px;
+    border: 1px solid #FCD34D;
+}
+
+.badge-concentration-low {
+    background-color: #D1FAE5;
+    color: #047857;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 11px;
+    border: 1px solid #6EE7B7;
+}
+
+/* Layout & Chart Heights */
+#tab-content {
+    min-height: 650px;
+}
+
+.app-container-max {
+    max-width: 1540px;
+}
+
+.app-content-container {
+    max-width: 1540px;
+    padding-bottom: 30px;
+}
+
+.chart-h-180 {
+    height: 180px;
+}
+
+.chart-h-300 {
+    height: 300px;
+}
+
+.chart-h-320 {
+    height: 320px;
+}
+
+.chart-h-380 {
+    height: 380px;
+}
+
+.chart-h-390 {
+    height: 390px;
+}
+
+.chart-h-460 {
+    height: 460px;
+}
+
+.progress-xs {
+    height: 5px;
+}
+
+.spotlight-stat-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--statec-navy);
+}
+
+.spotlight-stat-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--statec-blue);
+}
+
+.spotlight-section-title {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--statec-gray);
+    display: block;
+    margin-bottom: 6px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+/* Infobox & Hover Variants */
+.info-hover-card.variant-primary { border-left-color: var(--statec-blue); }
+.info-hover-card.variant-gold { border-left-color: var(--statec-yellow); }
+.info-hover-card.variant-danger { border-left-color: var(--statec-red); }
+.info-hover-card.variant-navy { border-left-color: var(--statec-navy); }
+.info-hover-card.variant-success { border-left-color: var(--statec-success); }
+
+.info-icon-primary { background-color: #EBF5FF; color: var(--statec-blue); border-color: var(--statec-blue); }
+.info-icon-gold { background-color: #FFFBEB; color: #B45309; border-color: #F59E0B; }
+.info-icon-danger { background-color: #FEF2F2; color: var(--statec-red); border-color: var(--statec-red); }
+.info-icon-navy { background-color: #F1F5F9; color: var(--statec-navy); border-color: #94A3B8; }
+.info-icon-success { background-color: #ECFDF5; color: var(--statec-success); border-color: #10B981; }
+
+.badge-gold {
+    background-color: var(--statec-yellow);
+    color: var(--statec-navy);
+}
+
+.infobox-primary { background-color: #F0F7FF; border-left: 4px solid var(--statec-blue) !important; }
+.infobox-gold { background-color: #FFFDF5; border-left: 4px solid var(--statec-yellow) !important; }
+.infobox-danger { background-color: #FEF2F2; border-left: 4px solid var(--statec-red) !important; }
+.infobox-navy { background-color: #F8FAFC; border-left: 4px solid var(--statec-navy) !important; }
+.infobox-success { background-color: #F0FDF4; border-left: 4px solid var(--statec-success) !important; }
+
+/* Icon Badge Modifiers */
+.icon-badge-header {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    background-color: #FFF9E6;
+    color: var(--statec-navy);
+}
+
+.icon-badge-gold {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+    background-color: #FFF9E6;
+    color: var(--statec-navy);
+}
+
+.icon-badge-blue {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+    background-color: #EFF6FF;
+    color: var(--statec-blue);
+}
+
+.icon-badge-amber {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+    background-color: #FEF3C7;
+    color: #B45309;
+}
+
+.icon-badge-emerald {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+    background-color: #DCFCE7;
+    color: #065F46;
+}

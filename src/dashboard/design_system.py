@@ -164,33 +164,10 @@ def apply_plot_theme(fig, title=None, x_title=None, y_title=None, hovermode=None
 
     return fig
 
-# Custom CSS styling dictionary adhering to modern executive design standards
-CARD_STYLE = {
-    "backgroundColor": SURFACE,
-    "borderRadius": "10px",
-    "border": f"1px solid {BORDER}",
-    "boxShadow": "0 2px 8px rgba(0, 26, 56, 0.04)",
-    "padding": "22px",
-    "marginBottom": "20px"
-}
-
-KPI_CARD_STYLE = {
-    "backgroundColor": SURFACE,
-    "borderRadius": "10px",
-    "border": f"1px solid {BORDER}",
-    "borderTop": f"4px solid {STATEC_NAVY}",
-    "boxShadow": "0 2px 8px rgba(0, 26, 56, 0.05)",
-    "padding": "20px 22px",
-    "height": "100%"
-}
-
-STATEC_HEADING_STYLE = {
-    "fontFamily": "'Montserrat', sans-serif",
-    "fontWeight": "800",
-    "textTransform": "uppercase",
-    "letterSpacing": "1.2px",
-    "color": STATEC_NAVY
-}
+# Custom CSS styling dictionaries kept as empty dicts for backwards compatibility
+CARD_STYLE = {}
+KPI_CARD_STYLE = {}
+STATEC_HEADING_STYLE = {}
 
 
 def apply_map_theme(fig, scope="europe"):
@@ -217,136 +194,33 @@ def apply_map_theme(fig, scope="europe"):
 
 from dash import html
 
-def create_icon_badge(icon_class: str, color: str = STATEC_NAVY, bg: str = None, size: int = 15, box_size: int = 34):
+def create_icon_badge(icon_class: str, variant: str = None, color: str = None, bg: str = None, size: int = None, box_size: int = None):
     """
     Renders a modern, professional vector icon badge with soft background.
     Uses Bootstrap Icons (e.g. 'bi bi-shield-check', 'bi bi-box-arrow-up-right').
     """
-    if bg is None:
-        bg = "rgba(0, 26, 56, 0.05)"
+    mod_cls = ""
+    if variant:
+        mod_cls = f"icon-badge-{variant}"
+    elif box_size == 40 or size == 20:
+        mod_cls = "icon-badge-header"
+    elif bg == "#EFF6FF" or color == STATEC_BLUE:
+        mod_cls = "icon-badge-blue"
+    elif bg == "#FFF9E6" or color == STATEC_NAVY:
+        mod_cls = "icon-badge-gold"
+    elif bg == "#FEF3C7" or color == "#B45309":
+        mod_cls = "icon-badge-amber"
+    elif bg == "#DCFCE7" or color == "#065F46":
+        mod_cls = "icon-badge-emerald"
+
     return html.Div(
-        html.I(className=icon_class, style={"fontSize": f"{size}px", "color": color, "lineHeight": "1"}),
-        style={
-            "width": f"{box_size}px",
-            "height": f"{box_size}px",
-            "borderRadius": "8px",
-            "backgroundColor": bg,
-            "display": "inline-flex",
-            "alignItems": "center",
-            "justifyContent": "center",
-            "flexShrink": "0",
-            "border": "1px solid rgba(0, 0, 0, 0.04)"
-        }
+        html.I(className=icon_class),
+        className=f"icon-badge {mod_cls}".strip()
     )
 
 
+INFO_HOVER_CSS = ""
 
-INFO_HOVER_CSS = """
-/* Interactive Hover Infobox Popovers */
-.info-hover-wrapper {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    vertical-align: middle;
-}
-
-.info-hover-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background-color: #EDF2F7;
-    color: #001A38;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    border: 1.5px solid #CBD5E1;
-    margin-left: 8px;
-    line-height: 1;
-    user-select: none;
-}
-
-.info-hover-wrapper:hover .info-hover-icon,
-.info-hover-icon:hover {
-    background-color: #FFC800 !important;
-    color: #001A38 !important;
-    border-color: #D9A700 !important;
-    transform: scale(1.15);
-    box-shadow: 0 2px 8px rgba(255, 200, 0, 0.45);
-}
-
-.info-hover-card {
-    visibility: hidden;
-    opacity: 0;
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    width: 450px;
-    max-width: 88vw;
-    background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-left: 4px solid #FFC800;
-    border-radius: 8px;
-    box-shadow: 0 14px 32px rgba(0, 26, 56, 0.22), 0 4px 12px rgba(0, 26, 56, 0.1);
-    padding: 14px 16px;
-    z-index: 999999;
-    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
-    transform: translateY(6px);
-    pointer-events: none;
-    text-align: left;
-    white-space: normal;
-}
-
-.info-hover-align-right .info-hover-card {
-    left: auto;
-    right: 0;
-}
-
-.info-hover-wrapper:hover .info-hover-card,
-.info-hover-card:hover {
-    visibility: visible;
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-}
-
-.info-hover-card::before {
-    content: "";
-    position: absolute;
-    top: -6px;
-    left: 18px;
-    width: 10px;
-    height: 10px;
-    background: #FFFFFF;
-    border-left: 1px solid #CBD5E1;
-    border-top: 1px solid #CBD5E1;
-    transform: rotate(45deg);
-}
-
-.info-hover-align-right .info-hover-card::before {
-    left: auto;
-    right: 18px;
-}
-
-.info-hover-text {
-    text-decoration: underline dotted #0066B2 1.5px;
-    text-underline-offset: 3px;
-    cursor: help;
-    display: inline-flex;
-    align-items: center;
-    position: relative;
-    color: inherit;
-    font-weight: 600;
-}
-.info-hover-text:hover {
-    color: #0066B2;
-}
-"""
-
-from dash import html
 
 def create_info_hover(
     title: str,
@@ -361,84 +235,32 @@ def create_info_hover(
     Renders an interactive hover element (info icon or text passage) that reveals
     a floating, formatted infobox tooltip when hovered.
     """
-    configs = {
-        "primary": {
-            "border": STATEC_BLUE,
-            "title_color": STATEC_NAVY,
-            "icon_bg": "#EBF5FF",
-            "icon_color": STATEC_BLUE,
-            "border_color": STATEC_BLUE
-        },
-        "gold": {
-            "border": STATEC_YELLOW,
-            "title_color": STATEC_NAVY,
-            "icon_bg": "#FFFBEB",
-            "icon_color": "#B45309",
-            "border_color": "#F59E0B"
-        },
-        "danger": {
-            "border": STATEC_RED,
-            "title_color": "#991B1B",
-            "icon_bg": "#FEF2F2",
-            "icon_color": STATEC_RED,
-            "border_color": STATEC_RED
-        },
-        "navy": {
-            "border": STATEC_NAVY,
-            "title_color": STATEC_NAVY,
-            "icon_bg": "#F1F5F9",
-            "icon_color": STATEC_NAVY,
-            "border_color": "#94A3B8"
-        },
-        "success": {
-            "border": "#059669",
-            "title_color": "#065F46",
-            "icon_bg": "#ECFDF5",
-            "icon_color": "#059669",
-            "border_color": "#10B981"
-        }
-    }
-    cfg = configs.get(variant, configs["gold"])
-
     content = text_or_elements if isinstance(text_or_elements, (list, tuple)) else [
-        html.P(text_or_elements, style={"fontSize": "12px", "color": STATEC_GRAY, "margin": "0", "lineHeight": "1.5"})
+        html.P(text_or_elements, className="text-muted-custom mb-0 small")
     ]
 
     card = html.Div([
         html.Div([
-            html.I(className="bi bi-info-circle-fill", style={"fontSize": "13px", "color": cfg["border"], "marginRight": "8px"}),
-            html.Span(title.upper(), style={
-                "fontFamily": "'Montserrat', sans-serif",
-                "fontWeight": "800",
-                "fontSize": "11px",
-                "letterSpacing": "0.6px",
-                "color": cfg["title_color"]
-            }),
+            html.I(className="bi bi-info-circle-fill me-2 small"),
+            html.Span(title.upper(), className="kpi-label mb-0"),
         ], className="d-flex align-items-center mb-1"),
-        html.Div(content, style={"paddingLeft": "23px"})
-    ], className="info-hover-card", style={"borderLeft": f"4px solid {cfg['border']}"})
+        html.Div(content, className="ps-3")
+    ], className=f"info-hover-card variant-{variant}")
 
-    icon_node = html.I(className="bi bi-info-lg", style={"fontSize": "11px", "fontWeight": "800"}) if (icon == "ⓘ" or not icon) else (
-        html.I(className=icon, style={"fontSize": "11px"}) if (isinstance(icon, str) and icon.startswith("bi ")) else icon
+    icon_node = html.I(className="bi bi-info-lg fw-bold") if (icon == "ⓘ" or not icon) else (
+        html.I(className=icon) if (isinstance(icon, str) and icon.startswith("bi ")) else icon
     )
 
     if label_text:
         trigger = html.Span([
-            html.Span(label_text, style={"marginRight": "4px"}),
-            html.Span(icon_node, className="info-hover-icon", style={
-                "backgroundColor": cfg["icon_bg"], "color": cfg["icon_color"], "borderColor": cfg["border_color"]
-            })
+            html.Span(label_text, className="me-1"),
+            html.Span(icon_node, className=f"info-hover-icon info-icon-{variant}")
         ], className="info-hover-text")
     else:
         trigger = html.Span(
             icon_node,
-            className="info-hover-icon",
-            title="Hover to view explanation",
-            style={
-                "backgroundColor": cfg["icon_bg"],
-                "color": cfg["icon_color"],
-                "borderColor": cfg["border_color"]
-            }
+            className=f"info-hover-icon info-icon-{variant}",
+            title="Hover to view explanation"
         )
 
     align_class = "info-hover-align-right" if align == "right" else ""
@@ -462,22 +284,10 @@ def create_section_header(
     """
     badge_elem = None
     if badge_text:
-        badge_bg = badge_color if badge_color else STATEC_YELLOW
-        badge_text_color = STATEC_NAVY if badge_bg == STATEC_YELLOW else "#FFFFFF"
+        badge_cls = "badge-navy" if badge_color == STATEC_NAVY else "badge-gold"
         badge_elem = html.Span(
             badge_text,
-            style={
-                "backgroundColor": badge_bg,
-                "color": badge_text_color,
-                "fontFamily": "'Montserrat', sans-serif",
-                "fontWeight": "800",
-                "fontSize": "10.5px",
-                "padding": "3px 9px",
-                "borderRadius": "4px",
-                "marginLeft": "12px",
-                "letterSpacing": "0.5px",
-                "textTransform": "uppercase"
-            }
+            className=f"section-badge {badge_cls}"
         )
 
     info_elem = None
@@ -491,104 +301,35 @@ def create_section_header(
         )
 
     title_row = html.Div([
-        html.H4(title, style={
-            "fontFamily": "'Montserrat', sans-serif",
-            "fontWeight": "800",
-            "color": STATEC_NAVY,
-            "margin": "0",
-            "letterSpacing": "0.4px"
-        }),
+        html.H4(title, className="section-title"),
         badge_elem,
         info_elem
     ], className="d-flex align-items-center mb-1 flex-wrap")
 
-    sub_elem = None
-    if subtitle:
-        sub_elem = html.P(
-            subtitle,
-            className="text-muted",
-            style={"fontSize": "12.5px", "margin": "0 0 10px 0", "lineHeight": "1.45"}
-        )
+    sub_elem = html.P(subtitle, className="section-subtitle") if subtitle else None
 
     return html.Div([
         title_row,
-        html.Div(style={
-            "width": "42px",
-            "height": "4px",
-            "backgroundColor": STATEC_YELLOW,
-            "borderRadius": "2px",
-            "marginBottom": "10px" if subtitle else "16px"
-        }),
+        html.Div(className="title-accent-bar"),
         sub_elem
-    ], className="mb-3")
+    ], className="section-header-box")
 
 
 def create_infobox(title: str, text_or_elements, icon: str = "💡", variant: str = "primary", className: str = "mb-3"):
     """
     Renders a concise styled infobox for key metric explanations.
-    Variants: 'primary' (Ministerial Blue), 'gold' (STATEC Yellow), 'danger' (Lux Lion Red), 'navy' (STATEC Navy), 'success' (Emerald).
     """
-    configs = {
-        "primary": {
-            "border": STATEC_BLUE,
-            "bg": "#F0F7FF",
-            "title_color": STATEC_NAVY,
-            "badge_bg": "#DBEAFE",
-            "badge_color": STATEC_BLUE
-        },
-        "gold": {
-            "border": STATEC_YELLOW,
-            "bg": "#FFFDF5",
-            "title_color": STATEC_NAVY,
-            "badge_bg": "#FEF3C7",
-            "badge_color": "#92400E"
-        },
-        "danger": {
-            "border": STATEC_RED,
-            "bg": "#FEF2F2",
-            "title_color": "#991B1B",
-            "badge_bg": "#FEE2E2",
-            "badge_color": "#991B1B"
-        },
-        "navy": {
-            "border": STATEC_NAVY,
-            "bg": "#F8FAFC",
-            "title_color": STATEC_NAVY,
-            "badge_bg": "#E2E8F0",
-            "badge_color": STATEC_NAVY
-        },
-        "success": {
-            "border": "#059669",
-            "bg": "#F0FDF4",
-            "title_color": "#065F46",
-            "badge_bg": "#DCFCE7",
-            "badge_color": "#065F46"
-        }
-    }
-    cfg = configs.get(variant, configs["primary"])
-
     content = text_or_elements if isinstance(text_or_elements, (list, tuple)) else [
-        html.P(text_or_elements, style={"fontSize": "12px", "color": STATEC_GRAY, "margin": "0", "lineHeight": "1.5"})
+        html.P(text_or_elements, className="text-muted-custom mb-0 small")
     ]
 
     return html.Div([
         html.Div([
-            html.Span(icon, style={"fontSize": "15px", "marginRight": "8px"}),
-            html.Span(title.upper(), style={
-                "fontFamily": "'Montserrat', sans-serif",
-                "fontWeight": "800",
-                "fontSize": "11px",
-                "letterSpacing": "0.6px",
-                "color": cfg["title_color"]
-            }),
+            html.Span(icon, className="me-2"),
+            html.Span(title.upper(), className="kpi-label mb-0"),
         ], className="d-flex align-items-center mb-1"),
-        html.Div(content, style={"paddingLeft": "23px"})
-    ], className=f"p-2 px-3 rounded {className}", style={
-        "backgroundColor": cfg["bg"],
-        "border": f"1px solid {BORDER}",
-        "borderLeft": f"4px solid {cfg['border']}",
-        "boxShadow": "0 1px 4px rgba(0, 26, 56, 0.04)"
-    })
+        html.Div(content, className="ps-3")
+    ], className=f"dash-card infobox-{variant} {className}")
 
 
 import pandas as pd
@@ -621,20 +362,11 @@ def get_concentration_badge(hhi: float):
     if pd.isna(hhi) or hhi is None:
         return html.Span("N/A", className="badge bg-secondary")
     if hhi >= 2500:
-        return html.Span(f"HHI {hhi:.0f} • High Concentration (>2500)", style={
-            "backgroundColor": "#FEE2E2", "color": "#B91C1C", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCA5A5"
-        })
+        return html.Span(f"HHI {hhi:.0f} • High Concentration (>2500)", className="badge-concentration-high")
     elif hhi >= 1500:
-        return html.Span(f"HHI {hhi:.0f} • Moderate Concentration (1500–2500)", style={
-            "backgroundColor": "#FEF3C7", "color": "#B45309", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCD34D"
-        })
+        return html.Span(f"HHI {hhi:.0f} • Moderate Concentration (1500–2500)", className="badge-concentration-mid")
     else:
-        return html.Span(f"HHI {hhi:.0f} • Low Concentration (<1500)", style={
-            "backgroundColor": "#D1FAE5", "color": "#047857", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #6EE7B7"
-        })
+        return html.Span(f"HHI {hhi:.0f} • Low Concentration (<1500)", className="badge-concentration-low")
 
 
 def create_dashboard_footer():
@@ -642,37 +374,21 @@ def create_dashboard_footer():
     return html.Footer([
         html.Div([
             html.Div([
-                html.Span("TRADE", style={
-                    "fontSize": "20px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
-                    "color": "#FFFFFF", "letterSpacing": "-0.5px"
-                }),
-                html.Span(".lu", style={
-                    "fontSize": "20px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
-                    "color": STATEC_YELLOW
-                }),
-                html.Span("INDEPENDENT EXTERNAL TRADE OBSERVATORY", style={
-                    "fontSize": "9px", "fontWeight": "700", "letterSpacing": "1.2px",
-                    "color": "#94A3B8", "display": "block", "marginTop": "2px"
-                }),
+                html.Span("TRADE", className="footer-logo-title"),
+                html.Span(".lu", className="footer-logo-accent"),
+                html.Span("INDEPENDENT EXTERNAL TRADE OBSERVATORY", className="footer-logo-sub"),
             ], className="mb-3 mb-md-0"),
 
             html.Div([
-                html.Span("Data sources: Eurostat Comext [ds-045409] & STATEC Open Data (2000–2026)", style={
-                    "fontSize": "11.5px", "color": "#CBD5E1", "display": "block"
-                }),
-                html.Span("Analytical Research Project • Hackathon 2026 (Unofficial Prototype)", style={
-                    "fontSize": "10.5px", "color": "#94A3B8", "display": "block", "marginTop": "2px"
-                }),
+                html.Span("Data sources: Eurostat Comext [ds-045409] & STATEC Open Data (2000–2026)", className="footer-source-text"),
+                html.Span("Analytical Research Project • Hackathon 2026 (Unofficial Prototype)", className="footer-proto-text"),
             ], className="text-md-end text-start"),
-        ], className="d-flex flex-column flex-md-row justify-content-between align-items-md-center py-4", style={"maxWidth": "1540px", "margin": "0 auto", "padding": "0 15px"}),
+        ], className="d-flex flex-column flex-md-row justify-content-between align-items-md-center py-4 footer-inner"),
 
         html.Div([
-            html.P("Disclaimer: This dashboard is an exploratory analytical research prototype created for the STATEC Hackathon 2026. It is not an official website or product of STATEC or the Government of the Grand Duchy of Luxembourg.", style={
-                "fontSize": "10.5px", "color": "#94A3B8", "margin": "0", "textAlign": "center", "padding": "12px 15px",
-                "backgroundColor": "#001226", "lineHeight": "1.5"
-            })
+            html.P("Disclaimer: This dashboard is an exploratory analytical research prototype created for the STATEC Hackathon 2026. It is not an official website or product of STATEC or the Government of the Grand Duchy of Luxembourg.", className="app-disclaimer-bar")
         ])
-    ], style={"backgroundColor": STATEC_NAVY, "marginTop": "60px", "color": "#FFFFFF", "borderTop": f"3px solid {STATEC_YELLOW}"})
+    ], className="app-footer")
 
 
 # Compatibility alias

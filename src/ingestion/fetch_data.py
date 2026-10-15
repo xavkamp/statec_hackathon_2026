@@ -279,7 +279,37 @@ def run_all_ingestion(force_reload: bool = False):
     logger.info("=== Tabular CSV Ingestion Completed Successfully ===")
 
 
+def assign_geo_tier(
+    code: str,
+    neighbors: set = None,
+    eu_codes: set = None,
+    non_eu_sub: pd.DataFrame = None,
+    neigh_share: float = None,
+    eu_share: float = None
+) -> str:
+    """Assign geopolitical tier dynamically using precalculated percentages instead of fixed strings."""
+    if neighbors is None:
+        neighbors = {"BE", "DE", "FR"}
+    if eu_codes is None:
+        eu_codes = {
+            "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU",
+            "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"
+        }
+
+    neigh_str = f"Direct Neighbors ({neigh_share:.1f}% of Goods)" if neigh_share is not None else "Direct Neighbors"
+    eu_str = f"EU Single Market Partners ({eu_share:.1f}%)" if eu_share is not None else "EU Single Market Partners"
+
+    if code in neighbors:
+        return neigh_str
+    elif code in eu_codes:
+        return eu_str
+    elif non_eu_sub is not None and "partner_code" in non_eu_sub.columns and code in non_eu_sub["partner_code"].values:
+        return "Strategic Non-EU Suppliers"
+    return "Other Partners"
+
+
 if __name__ == "__main__":
     run_all_ingestion()
+
 
 
