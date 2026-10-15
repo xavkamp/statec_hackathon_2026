@@ -199,7 +199,7 @@ def process_seasonal_decomposition() -> pd.DataFrame:
 
 
 def process_country_benchmarks() -> pd.DataFrame:
-    """Compute comparative trade metrics across Luxembourg and peer countries."""
+    """Compute comparative trade metrics across Luxembourg and peer countries by product."""
     raw_path = RAW_DIR / "country_benchmarks_annual_raw.csv"
     logger.info(f"Processing country benchmarks from {raw_path.name}")
     df = pd.read_csv(raw_path)
@@ -207,11 +207,13 @@ def process_country_benchmarks() -> pd.DataFrame:
     df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
     df["reporter_code"] = df["reporter"]
     df["reporter_name"] = df["reporter_label"].apply(lambda s: str(s).split("(")[0].strip())
+    df["product_code"] = df["product"].astype(str)
+    df["product_name"] = df["product_label"].astype(str) if "product_label" in df.columns else df["product_code"]
     df["flow"] = df["flow_label"].str.upper()
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce")
+    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
 
     piv = df.pivot_table(
-        index=["year", "reporter_code", "reporter_name"],
+        index=["year", "reporter_code", "reporter_name", "product_code", "product_name"],
         columns="flow",
         values="value_eur",
         aggfunc="sum"
@@ -227,15 +229,24 @@ def process_country_benchmarks() -> pd.DataFrame:
     piv["trade_balance_eur"] = piv["EXPORT"] - piv["IMPORT"]
     piv["coverage_ratio_pct"] = np.where(piv["IMPORT"] > 0, (piv["EXPORT"] / piv["IMPORT"]) * 100, np.nan)
 
-    piv = piv.sort_values(["reporter_code", "year"])
-    base_years = piv[piv["year"] == 2000].set_index("reporter_code")
+    piv = piv.sort_values(["reporter_code", "product_code", "year"])
+    base_years = piv[piv["year"] == 2000].set_index(["reporter_code", "product_code"])
     base_export = base_years["EXPORT"].to_dict()
     base_import = base_years["IMPORT"].to_dict()
     base_volume = base_years["trade_volume_eur"].to_dict()
 
-    piv["export_index_2000"] = piv.apply(lambda r: (r["EXPORT"] / base_export[r["reporter_code"]]) * 100 if base_export.get(r["reporter_code"], 0) > 0 else np.nan, axis=1)
-    piv["import_index_2000"] = piv.apply(lambda r: (r["IMPORT"] / base_import[r["reporter_code"]]) * 100 if base_import.get(r["reporter_code"], 0) > 0 else np.nan, axis=1)
-    piv["volume_index_2000"] = piv.apply(lambda r: (r["trade_volume_eur"] / base_volume[r["reporter_code"]]) * 100 if base_volume.get(r["reporter_code"], 0) > 0 else np.nan, axis=1)
+    piv["export_index_2000"] = piv.apply(
+        lambda r: (r["EXPORT"] / base_export.get((r["reporter_code"], r["product_code"]), 0)) * 100
+        if base_export.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
+    )
+    piv["import_index_2000"] = piv.apply(
+        lambda r: (r["IMPORT"] / base_import.get((r["reporter_code"], r["product_code"]), 0)) * 100
+        if base_import.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
+    )
+    piv["volume_index_2000"] = piv.apply(
+        lambda r: (r["trade_volume_eur"] / base_volume.get((r["reporter_code"], r["product_code"]), 0)) * 100
+        if base_volume.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
+    )
 
     out_file = PROCESSED_DIR / "country_benchmarks.csv"
     piv.to_csv(out_file, index=False, encoding="utf-8")

@@ -71,7 +71,7 @@ def load_seasonal_decomposition() -> pd.DataFrame:
 
 
 def load_country_benchmarks() -> pd.DataFrame:
-    return _load_csv_cached("country_benchmarks.csv")
+    return _load_csv_cached("country_benchmarks.csv", dtype={"product_code": str, "reporter_code": str})
 
 
 def load_drilldown_lvl2() -> pd.DataFrame:

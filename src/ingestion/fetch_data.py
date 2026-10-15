@@ -120,16 +120,23 @@ def fetch_hs2_products_annual_csv(force_reload: bool = False) -> Path:
     return output_file
 
 
+BENCHMARK_PRODUCTS = [
+    "TOTAL", "87", "84", "85", "30", "72", "73", "27", "39", "90",
+    "04", "22", "10", "76", "40", "94", "25", "48", "62", "88"
+]
+
+
 def fetch_country_benchmarks_csv(force_reload: bool = False) -> Path:
-    """Fetch annual trade for peer countries (LU, BE, DE, FR, NL) directly to CSV."""
+    """Fetch annual trade for peer countries (LU, BE, DE, FR, NL) across TOTAL and key product chapters directly to CSV."""
     output_file = RAW_DIR / "country_benchmarks_annual_raw.csv"
     if output_file.exists() and not force_reload:
         logger.info(f"Using existing raw file: {output_file.name}")
         return output_file
 
     reporters_param = "&".join([f"reporter={r}" for r in PEER_REPORTERS])
+    prod_params = "&".join([f"product={c}" for c in BENCHMARK_PRODUCTS])
     url = (
-        f"{COMEXT_API_URL}?freq=A&{reporters_param}&partner=WORLD&product=TOTAL"
+        f"{COMEXT_API_URL}?freq=A&{reporters_param}&partner=WORLD&{prod_params}"
         f"&indicators=VALUE_IN_EUROS&sinceTimePeriod={START_YEAR}&untilTimePeriod={END_YEAR}"
     )
     df = fetch_jsonstat_df(url)
