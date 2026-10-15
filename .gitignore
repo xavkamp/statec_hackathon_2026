@@ -7,3 +7,6 @@ __pycache__/
 env/
 venv/
 data/bronze/*.json
+
+# Staging & exploratory scratch workspace
+scratch/

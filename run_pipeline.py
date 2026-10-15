@@ -27,9 +27,16 @@ def main():
     parser.add_argument("--process", action="store_true", help="Transform raw CSVs into aggregated data/processed/*.csv tables")
     parser.add_argument("--app", action="store_true", help="Launch the interactive Dash dashboard")
     parser.add_argument("--all", action="store_true", help="Run end-to-end pipeline (Ingest CSV -> Process CSV -> Launch App)")
+    parser.add_argument("--test", action="store_true", help="Execute the comprehensive automated test suite in tests/")
     parser.add_argument("--port", type=int, default=8050, help="Port for Dash server (default: 8050)")
 
     args = parser.parse_args()
+
+    if args.test:
+        logger.info("Executing Master Test Suite in tests/...")
+        from tests.run_all_tests import run_all
+        run_all()
+        return
 
     # If no flags passed, default to launching app
     if not (args.ingest or args.process or args.app or args.all):
