@@ -257,62 +257,65 @@ def fetch_hs4_products_annual_csv(years: List[int] = [2020, 2021, 2022, 2023, 20
     return output_file
 
 
+def fetch_hs8_products_annual_csv(years: List[int] = [2020, 2021, 2022, 2023, 2024, 2025], force_reload: bool = False) -> Path:
+    """Fetch Luxembourg annual trade for all 8-digit CN tariff lines directly to CSV."""
+    output_file = RAW_DIR / "hs8_products_annual_raw.csv"
+    if output_file.exists() and not force_reload:
+        logger.info(f"Using existing raw file: {output_file.name}")
+        return output_file
+
+    dfs = []
+    for y in years:
+        url = (
+            f"{COMEXT_API_URL}?freq=A&reporter={PRIMARY_REPORTER}&partner=WORLD"
+            f"&time={y}&indicators=VALUE_IN_EUROS"
+        )
+        try:
+            df = fetch_jsonstat_df(url)
+            if not df.empty:
+                df["code_len"] = df["product"].astype(str).str.len()
+                df8 = df[df["code_len"] == 8].drop(columns=["code_len"]).copy()
+                dfs.append(df8)
+        except Exception as e:
+            logger.error(f"Error fetching HS8 products for {y}: {e}")
+
+    combined_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    combined_df.to_csv(output_file, index=False, encoding="utf-8")
+    logger.info(f"Saved {output_file.name}: {len(combined_df):,} rows")
+    return output_file
+
+
 def run_all_ingestion(force_reload: bool = False):
     """Run full ingestion pipeline writing directly to CSV."""
     logger.info("=== Starting Eurostat Comext Ingestion to Tabular CSV (data/raw/) ===")
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info("1/7: Extracting annual partner trade to CSV...")
+    logger.info("1/8: Extracting annual partner trade to CSV...")
     fetch_partners_annual_csv(force_reload=force_reload)
 
-    logger.info("2/7: Extracting annual HS2 product trade to CSV...")
+    logger.info("2/8: Extracting annual HS2 product trade to CSV...")
     fetch_hs2_products_annual_csv(force_reload=force_reload)
 
-    logger.info("3/7: Extracting annual HS4 product subheadings to CSV...")
+    logger.info("3/8: Extracting annual HS4 product subheadings to CSV...")
     fetch_hs4_products_annual_csv(force_reload=force_reload)
 
-    logger.info("4/7: Extracting peer country benchmarks to CSV...")
+    logger.info("4/8: Extracting annual CN8 product tariff lines to CSV...")
+    fetch_hs8_products_annual_csv(force_reload=force_reload)
+
+    logger.info("5/8: Extracting peer country benchmarks to CSV...")
     fetch_country_benchmarks_csv(force_reload=force_reload)
 
-    logger.info("5/7: Extracting monthly seasonality data to CSV...")
+    logger.info("6/8: Extracting monthly seasonality data to CSV...")
     fetch_monthly_seasonality_csv(force_reload=force_reload)
 
-    logger.info("6/7: Extracting hierarchical partner drilldown (HS2 -> CN8) to CSV...")
+    logger.info("7/8: Extracting hierarchical partner drilldown (HS2 -> CN8) to CSV...")
     fetch_partner_drilldown_csv(force_reload=force_reload)
 
-    logger.info("7/7: Extracting product trading partners (HS2 across countries) to CSV...")
+    logger.info("8/8: Extracting product trading partners (HS2 across countries) to CSV...")
     fetch_product_partners_csv(force_reload=force_reload)
 
     logger.info("=== Tabular CSV Ingestion Completed Successfully ===")
-
-
-def assign_geo_tier(
-    code: str,
-    neighbors: set = None,
-    eu_codes: set = None,
-    non_eu_sub: pd.DataFrame = None,
-    neigh_share: float = None,
-    eu_share: float = None
-) -> str:
-    """Assign geopolitical tier dynamically using precalculated percentages instead of fixed strings."""
-    if neighbors is None:
-        neighbors = {"BE", "DE", "FR"}
-    if eu_codes is None:
-        eu_codes = {
-            "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU",
-            "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"
-        }
-
-    neigh_str = f"Direct Neighbors ({neigh_share:.1f}% of Goods)" if neigh_share is not None else "Direct Neighbors"
-    eu_str = f"EU Single Market Partners ({eu_share:.1f}%)" if eu_share is not None else "EU Single Market Partners"
-
-    if code in neighbors:
-        return neigh_str
-    elif code in eu_codes:
-        return eu_str
-    elif non_eu_sub is not None and "partner_code" in non_eu_sub.columns and code in non_eu_sub["partner_code"].values:
-        return "Strategic Non-EU Suppliers"
-    return "Other Partners"
 
 
 if __name__ == "__main__":

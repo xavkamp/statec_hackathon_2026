@@ -19,6 +19,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from src.config import START_YEAR, END_YEAR
+
 from src.dashboard.design_system import (
     PRIMARY, SECONDARY, SUCCESS, DANGER, WARNING, NEUTRAL,
     SURFACE, BACKGROUND, BORDER, TEXT_PRIMARY, TEXT_MUTED,
@@ -27,11 +29,11 @@ from src.dashboard.design_system import (
     add_iso3_column, ISO2_TO_ISO3, STATEC_NAVY, STATEC_YELLOW, STATEC_BLUE,
     STATEC_RED, STATEC_GRAY, STATEC_BG,
     create_section_header, create_dashboard_footer, create_infobox,
-    create_info_hover, fmt_eur, fmt_pct, get_concentration_badge
+    create_infobox_item, create_info_hover, INFO_HOVER_CSS, fmt_eur, fmt_pct, get_concentration_badge
 )
 from src.dashboard.data_loader import (
     load_overview_kpis, load_partner_rankings, load_product_rankings,
-    load_hs4_product_rankings, load_product_partners, load_seasonal_decomposition,
+    load_hs4_product_rankings, load_hs8_product_rankings, load_product_partners, load_seasonal_decomposition,
     load_country_benchmarks, load_drilldown_lvl2, load_drilldown_lvl4, load_drilldown_lvl8
 )
 
@@ -55,6 +57,9 @@ def get_country_name(code: str) -> str:
 
 
 # ── Canonical Resilience Radar Baskets ─────────────────────────────────────
+_CRITICAL_CHS = {"27", "01", "02", "03", "04", "10", "16", "19", "22", "30", "90", "72", "73", "25", "26", "76", "84", "85", "87", "88", "1", "2", "3", "4"}
+NON_CRITICAL_CHAPTERS = [f"{i:02d}" for i in range(1, 100) if f"{i:02d}" not in _CRITICAL_CHS] + [str(i) for i in range(1, 100) if f"{i:02d}" not in _CRITICAL_CHS]
+
 RESILIENCE_BASKETS = {
     "ALL": {
         "name": "All Product Categories",
@@ -71,7 +76,7 @@ RESILIENCE_BASKETS = {
     "FOOD": {
         "name": "Food & Nutrition",
         "short_name": "Food & Nutrition",
-        "chapters": ["01", "02", "03", "04", "10", "16", "19", "22"],
+        "chapters": ["01", "02", "03", "04", "10", "16", "19", "22", "1", "2", "3", "4"],
         "desc": "Dairy, meat, cereals, beverages, essential nutrition"
     },
     "HEALTH": {
@@ -98,16 +103,23 @@ RESILIENCE_BASKETS = {
         "chapters": ["87", "88"],
         "desc": "Passenger cars, commercial transport equipment, aerospace"
     },
+    "NON_CRITICAL": {
+        "name": "Other Non-Critical Categories",
+        "short_name": "Non-Critical Categories",
+        "chapters": NON_CRITICAL_CHAPTERS,
+        "desc": "All merchandise tariff lines outside the 6 designated critical resilience baskets (Plastics, Rubber, Chemicals, Wood, Textiles, Paper, etc.)"
+    },
 }
 
 BASKET_FILTER_OPTIONS = [
     {"label": "All Product Categories", "value": "ALL"},
-    {"label": "Energy & Fuels (Ch. 27)", "value": "ENERGY"},
-    {"label": "Food & Nutrition (Ch. 01–04, 10, 16, 19, 22)", "value": "FOOD"},
-    {"label": "Health & Medicines (Ch. 30, 90)", "value": "HEALTH"},
-    {"label": "Raw Materials & Metals (Ch. 25–26, 72–73, 76)", "value": "METALS"},
-    {"label": "Tech & Machinery (Ch. 84, 85)", "value": "TECH"},
-    {"label": "Vehicles & Transport (Ch. 87, 88)", "value": "VEHICLES"},
+    {"label": "Energy & Fuels (27)", "value": "ENERGY"},
+    {"label": "Food & Nutrition (01–04, 10, 16, 19, 22)", "value": "FOOD"},
+    {"label": "Health & Medicines (30, 90)", "value": "HEALTH"},
+    {"label": "Raw Materials & Metals (25–26, 72–73, 76)", "value": "METALS"},
+    {"label": "Tech & Machinery (84, 85)", "value": "TECH"},
+    {"label": "Vehicles & Transport (87, 88)", "value": "VEHICLES"},
+    {"label": "Other Non-Critical Categories", "value": "NON_CRITICAL"},
 ]
 
 
@@ -122,20 +134,23 @@ app = dash.Dash(
     title="Luxembourg Trade Intelligence (Resilience Radar) — STATEC Hackathon 2026",
     suppress_callback_exceptions=True
 )
-app.index_string = """<!DOCTYPE html>
+app.index_string = f"""<!DOCTYPE html>
 <html>
     <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
+        {{%metas%}}
+        <title>{{%title%}}</title>
+        {{%favicon%}}
+        {{%css%}}
+        <style>
+{INFO_HOVER_CSS}
+        </style>
     </head>
     <body>
-        {%app_entry%}
+        {{%app_entry%}}
         <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
+            {{%config%}}
+            {{%scripts%}}
+            {{%renderer%}}
         </footer>
     </body>
 </html>"""
@@ -144,6 +159,16 @@ server = app.server
 
 # ── Header ─────────────────────────────────────────────────────────────────
 def create_header():
+    kpis = load_overview_kpis()
+    if not kpis.empty and "year" in kpis.columns:
+        kpis_valid = kpis[(kpis["year"] >= START_YEAR) & (kpis["year"] <= END_YEAR)]
+        year_list = sorted(kpis_valid["year"].dropna().astype(int).unique(), reverse=True)
+    else:
+        year_list = list(range(END_YEAR, START_YEAR - 1, -1))
+    def_year = year_list[0] if year_list else END_YEAR
+    min_yr = year_list[-1] if year_list else START_YEAR
+    max_yr = year_list[0] if year_list else END_YEAR
+
     return html.Div([
         html.Div([
             dbc.Container([
@@ -158,7 +183,7 @@ def create_header():
                             html.Div(className="brand-divider d-none d-lg-block"),
                             html.Div([
                                 html.Span("LUXEMBOURG EXTERNAL TRADE INTELLIGENCE", className="portal-title"),
-                                html.Span("Eurostat Comext Open Data [ds-045409] (2000–2026)", className="portal-subtitle"),
+                                html.Span(f"Eurostat Comext Open Data [ds-045409] ({min_yr}–{max_yr})", className="portal-subtitle"),
                             ], className="d-none d-lg-block"),
                         ], className="d-flex align-items-center py-2")
                     ], md=8),
@@ -172,8 +197,8 @@ def create_header():
                                 ], className="header-filter-label"),
                                 dcc.Dropdown(
                                     id="global-year-dropdown",
-                                    options=[{"label": str(y), "value": y} for y in range(2025, 1999, -1)],
-                                    value=2025,
+                                    options=[{"label": str(y), "value": y} for y in year_list],
+                                    value=def_year,
                                     clearable=False,
                                     className="header-year-dropdown"
                                 )
@@ -192,6 +217,10 @@ def create_compact_kpi_ribbon(year: int):
     if df.empty:
         return html.Div()
 
+    df = df[(df["year"] >= START_YEAR) & (df["year"] <= END_YEAR)]
+    if df.empty:
+        return html.Div()
+
     row = df[df["year"] == year]
     if row.empty:
         row = df[df["year"] == df["year"].max()]
@@ -201,7 +230,9 @@ def create_compact_kpi_ribbon(year: int):
     imp_val = r.get("IMPORT", 0.0)
     bal_val = r.get("trade_balance_eur", exp_val - imp_val)
     cov_val = r.get("coverage_ratio_pct", (exp_val / imp_val * 100) if imp_val > 0 else 0)
-    eu_imp = r.get("intra_eu_import_share_pct", 84.5)
+    eu_imp = r.get("intra_eu_import_share_pct")
+    if eu_imp is None or pd.isna(eu_imp):
+        eu_imp = (r.get("intra_eu_import_eur", 0.0) / imp_val * 100) if imp_val > 0 else 0.0
 
     return html.Div([
         dbc.Row([
@@ -254,27 +285,27 @@ def create_navigation_boxes():
         html.Div([
             html.Button([
                 html.I(className="bi bi-shield-check me-1 text-warning"),
-                "Resilience Radar"
+                "1. Resilience Radar"
             ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
 
             html.Button([
                 html.I(className="bi bi-geo-alt me-1"),
-                "Trading Partners (Q1 & Q4)"
+                "2. Trading Partners"
             ], id="btn-tab-partners", className="nav-tab-btn", n_clicks=0),
 
             html.Button([
                 html.I(className="bi bi-boxes me-1"),
-                "Product Categories (Q2 & Q3)"
+                "3. Product Categories"
             ], id="btn-tab-products", className="nav-tab-btn", n_clicks=0),
 
             html.Button([
                 html.I(className="bi bi-bar-chart-steps me-1"),
-                "Peer Benchmarks (Q5)"
+                "4. Peer Benchmarks"
             ], id="btn-tab-benchmarks", className="nav-tab-btn", n_clicks=0),
 
             html.Button([
                 html.I(className="bi bi-calendar-range me-1"),
-                "Seasonality (Q6)"
+                "5. Seasonality Analysis"
             ], id="btn-tab-seasonality", className="nav-tab-btn", n_clicks=0),
         ], className="d-flex flex-wrap align-items-center nav-mode-container")
     ], className="mb-3")
@@ -343,9 +374,9 @@ def switch_active_nav_tab(*args):
 def render_main_tab_content(active_tab, selected_year):
     if active_tab == "tab-resilience":
         return render_tab_resilience(selected_year)
-    elif active_tab in ["tab-partners", "tab-q4-drilldown"]:
+    elif active_tab == "tab-partners":
         return render_tab_partners(selected_year)
-    elif active_tab in ["tab-products", "tab-q3-partners"]:
+    elif active_tab == "tab-products":
         return render_tab_products(selected_year)
     elif active_tab == "tab-benchmarks":
         return render_tab_benchmarks(selected_year)
@@ -367,26 +398,28 @@ def render_tab_resilience(selected_year):
     if pp_df.empty and kpis_df.empty:
         return html.Div("Resilience data not available.")
 
-    BASKETS = {
-        "Energy & Fuels": {"chapters": ["27"], "desc": "Refined petroleum, natural gas, electrical energy"},
-        "Food & Nutrition": {"chapters": ["01", "02", "03", "04", "10", "16", "19", "22"], "desc": "Dairy, meat, cereals, beverages, essential nutrition"},
-        "Health & Medicines": {"chapters": ["30", "90"], "desc": "Pharmaceutical products, surgical & medical instruments"},
-        "Raw Materials & Metals": {"chapters": ["72", "73", "25", "26"], "desc": "Iron, steel, construction minerals"},
-        "Tech & Machinery": {"chapters": ["84", "85"], "desc": "Computers, electrical generators, telecom apparatus"},
-        "Vehicles & Transport": {"chapters": ["87"], "desc": "Passenger cars, commercial transport equipment"},
-    }
+    # Bound datasets strictly to configured time span
+    if not kpis_df.empty and "year" in kpis_df.columns:
+        kpis_df = kpis_df[(kpis_df["year"] >= START_YEAR) & (kpis_df["year"] <= END_YEAR)]
+    if not partners_df.empty and "year" in partners_df.columns:
+        partners_df = partners_df[(partners_df["year"] >= START_YEAR) & (partners_df["year"] <= END_YEAR)]
+    if not pp_df.empty and "year" in pp_df.columns:
+        pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
+    if not hs4_df.empty and "year" in hs4_df.columns:
+        hs4_df = hs4_df[(hs4_df["year"] >= START_YEAR) & (hs4_df["year"] <= END_YEAR)]
 
-    hs4_df = load_hs4_product_rankings()
+    active_baskets = {k: v for k, v in RESILIENCE_BASKETS.items() if k not in ["ALL", "NON_CRITICAL"]}
     cards = []
     comparison_data = []
 
     use_year = selected_year
     sub_yr = pp_df[(pp_df["flow"] == "IMPORT") & (pp_df["year"] == use_year)]
-    if sub_yr.empty:
-        use_year = pp_df["year"].max()
+    if sub_yr.empty and not pp_df.empty:
+        use_year = int(pp_df["year"].max())
         sub_yr = pp_df[(pp_df["flow"] == "IMPORT") & (pp_df["year"] == use_year)]
 
-    for basket_name, info in BASKETS.items():
+    for basket_key, info in active_baskets.items():
+        basket_name = info["name"]
         chs = info["chapters"]
         basket_data = sub_yr[sub_yr["hs2_code"].isin(chs)]
         if not basket_data.empty:
@@ -436,15 +469,24 @@ def render_tab_resilience(selected_year):
                     html.Div([
                         html.Span("Top Supplier: ", className="text-muted small"),
                         html.Strong(f"{top_p_name} ({top_p_share:.1f}%)", className="small")
-                    ], className="mb-1"),
+                    ], className="mb-2"),
                     html.Div([
-                        html.Span("Via BE/NL Transit Hubs: ", className="text-muted small"),
-                        html.Strong(f"{hub_share:.1f}%", className=f"small {'text-warning' if hub_share > 50 else ''}")
+                        html.Div([
+                            html.Span("Direct Origin", className="text-muted small"),
+                            html.Span(f"{100-hub_share:.0f}%", className="small fw-bold text-primary"),
+                            html.Span(" • BE/NL Ports ", className="text-muted small ms-2"),
+                            html.Span(f"{hub_share:.0f}%", className=f"small fw-bold {'text-warning' if hub_share > 50 else 'text-info'}")
+                        ], className="d-flex justify-content-between align-items-center mb-1"),
+                        dbc.Progress([
+                            dbc.Progress(value=100-hub_share, color="primary", bar=True),
+                            dbc.Progress(value=hub_share, color="warning" if hub_share > 50 else "info", bar=True),
+                        ], className="progress-xs")
                     ])
                 ], className="dash-kpi-card")
             ], md=4, sm=6, className="mb-3"))
 
     fig_comp = go.Figure()
+    fig_matrix = go.Figure()
     if comparison_data:
         comp_df = pd.DataFrame(comparison_data).sort_values("hhi", ascending=True)
         fig_comp.add_trace(go.Bar(
@@ -461,27 +503,58 @@ def render_tab_resilience(selected_year):
         # Highly visible threshold reference lines at top of graph
         fig_comp.add_vline(
             x=1500, line_dash="dash", line_color=WARNING, line_width=2,
-            annotation_text="<b>Threshold: HHI = 1,500 (Moderate)</b>",
+            annotation_text="<b>HHI = 1,500 (Moderate)</b>",
             annotation_position="top left",
-            annotation_font=dict(size=11, color=WARNING, family="Inter, sans-serif"),
+            annotation_font=dict(size=10, color=WARNING, family="Inter, sans-serif"),
             annotation_bgcolor="#FFFFFF"
         )
         fig_comp.add_vline(
             x=2500, line_dash="dash", line_color=DANGER, line_width=2,
-            annotation_text="<b>Threshold: HHI = 2,500 (High)</b>",
+            annotation_text="<b>HHI = 2,500 (High)</b>",
             annotation_position="top right",
-            annotation_font=dict(size=11, color=DANGER, family="Inter, sans-serif"),
+            annotation_font=dict(size=10, color=DANGER, family="Inter, sans-serif"),
             annotation_bgcolor="#FFFFFF"
         )
         # Explicit legend traces for color definitions
-        fig_comp.add_trace(go.Bar(name="High Concentration (HHI > 2,500)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
-        fig_comp.add_trace(go.Bar(name="Moderate Concentration (1,500–2,500)", x=[None], y=[None], marker_color=WARNING, showlegend=True))
-        fig_comp.add_trace(go.Bar(name="Low / Diversified (HHI < 1,500)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
+        fig_comp.add_trace(go.Bar(name="High (>2,500)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+        fig_comp.add_trace(go.Bar(name="Moderate (1,500–2,500)", x=[None], y=[None], marker_color=WARNING, showlegend=True))
+        fig_comp.add_trace(go.Bar(name="Diversified (<1,500)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_comp.update_layout(
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
-            margin=dict(l=150, r=50, t=35, b=30),
+            margin=dict(l=140, r=40, t=35, b=30),
             yaxis=dict(autorange="reversed")
+        )
+
+        # 2D Vulnerability Matrix (Bubble Plot)
+        fig_matrix.add_trace(go.Scatter(
+            x=comp_df["hhi"],
+            y=comp_df["val_m"],
+            mode="markers+text",
+            text=comp_df["basket"],
+            textposition="top center",
+            textfont=dict(family="Inter, sans-serif", size=10, color=TEXT_PRIMARY),
+            marker=dict(
+                size=np.clip(comp_df["top_share"] * 0.9, 18, 48),
+                color=[DANGER if h >= 2500 else (WARNING if h >= 1500 else SUCCESS) for h in comp_df["hhi"]],
+                line=dict(width=1.5, color="#1E293B"),
+                opacity=0.88
+            ),
+            customdata=np.stack([comp_df["top_name"], comp_df["top_share"], comp_df["hub_share"]], axis=-1),
+            hovertemplate=(
+                "<b>%{text}</b><br>"
+                "Import Volume: €%{y:,.0f}M<br>"
+                "Supplier Concentration: HHI %{x:.0f}<br>"
+                "Top Supplier: %{customdata[0]} (%{customdata[1]:.1f}%)<br>"
+                "BE/NL Transit: %{customdata[2]:.1f}%<extra></extra>"
+            )
+        ))
+        apply_plot_theme(fig_matrix, x_title="Supplier Concentration (HHI)", y_title="Import Value (€M)")
+        fig_matrix.add_vline(x=1500, line_dash="dash", line_color=WARNING, line_width=1.5)
+        fig_matrix.add_vline(x=2500, line_dash="dash", line_color=DANGER, line_width=1.5)
+        fig_matrix.update_layout(
+            margin=dict(l=60, r=25, t=35, b=30),
+            showlegend=False
         )
 
     # Macroeconomic Trajectory & Geopolitical Origin Figures
@@ -489,6 +562,10 @@ def render_tab_resilience(selected_year):
     fig_balance = go.Figure()
     fig_eu = go.Figure()
     vol_growth_pct = 0.0
+
+    min_kpi_yr = int(kpis_df["year"].min()) if not kpis_df.empty else START_YEAR
+    max_kpi_yr = int(kpis_df["year"].max()) if not kpis_df.empty else END_YEAR
+    span_kpi_yr = max_kpi_yr - min_kpi_yr + 1
 
     if not kpis_df.empty:
         fig_trajectory.add_trace(go.Scatter(
@@ -506,7 +583,10 @@ def render_tab_resilience(selected_year):
             hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
         ))
         apply_plot_theme(fig_trajectory, y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
-        fig_trajectory.update_yaxes(range=[7, 28])
+        max_v = max(kpis_df["IMPORT"].max(), kpis_df["EXPORT"].max()) / 1e9
+        min_v = min(kpis_df["IMPORT"].min(), kpis_df["EXPORT"].min()) / 1e9
+        fig_trajectory.update_yaxes(range=[max(0.0, min_v * 0.8), max_v * 1.15])
+        fig_trajectory.update_xaxes(range=[min_kpi_yr - 0.2, max_kpi_yr + 0.2])
         fig_trajectory.update_layout(margin=dict(l=40, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
         colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
@@ -516,6 +596,7 @@ def render_tab_resilience(selected_year):
             hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
         ))
         apply_plot_theme(fig_balance, y_title="Billion Euros (€B)", dtick_x=2)
+        fig_balance.update_xaxes(range=[min_kpi_yr - 0.5, max_kpi_yr + 0.5])
         fig_balance.update_layout(margin=dict(l=40, r=20, t=25, b=30))
 
         if "intra_eu_import_share_pct" in kpis_df.columns:
@@ -530,9 +611,10 @@ def render_tab_resilience(selected_year):
             ))
         apply_plot_theme(fig_eu, y_title="Share of Total (%)", dtick_x=5)
         fig_eu.update_yaxes(range=[55, 98])
+        fig_eu.update_xaxes(range=[min_kpi_yr - 0.2, max_kpi_yr + 0.2])
         fig_eu.update_layout(margin=dict(l=45, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
-        v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
+        v_start = kpis_df[kpis_df["year"] == min_kpi_yr]["trade_volume_eur"].iloc[0]
         v_sub = kpis_df[kpis_df["year"] == use_year]
         v_end = v_sub["trade_volume_eur"].iloc[0] if not v_sub.empty else kpis_df["trade_volume_eur"].iloc[-1]
         vol_growth_pct = ((v_end / v_start) - 1.0) * 100 if v_start > 0 else 0.0
@@ -594,23 +676,20 @@ def render_tab_resilience(selected_year):
     return html.Div([
         create_compact_kpi_ribbon(use_year),
 
-        # Section 1: Macro Trajectory & Geopolitical Origins
-        create_section_header(
-            "MACRO TRAJECTORY & GEOPOLITICAL ORIGINS",
-            f"25-Year merchandise trade trajectory ({vol_growth_pct:+.1f}% volume growth vs 2000), trade balance evolution, EU Single Market integration, and third-country supplier exposure."
-        ),
+        # Section 1.1: Macro Trajectory & Geopolitical Origins
+        create_section_header("1.1 MACRO TRAJECTORY & GEOPOLITICAL ORIGINS"),
 
         # Row 1: Macro Trajectory & Trade Balance
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6("25-YEAR TRAJECTORY OF MERCHANDISE TRADE FLOWS (2000–2026)", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.1: {span_kpi_yr}-YEAR TRAJECTORY OF MERCHANDISE TRADE FLOWS ({min_kpi_yr}–{max_kpi_yr})", className="card-title-upper"),
                     dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})
                 ], className="dash-card")
             ], md=8),
             dbc.Col([
                 html.Div([
-                    html.H6("ANNUAL MERCHANDISE TRADE BALANCE (€B)", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.2: ANNUAL MERCHANDISE TRADE BALANCE ({min_kpi_yr}–{max_kpi_yr}) (€B)", className="card-title-upper"),
                     dcc.Graph(figure=fig_balance, config={"displayModeBar": False})
                 ], className="dash-card")
             ], md=4),
@@ -620,50 +699,51 @@ def render_tab_resilience(selected_year):
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6("REGIONAL IMPORT ORIGIN EXPOSURE", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.3: REGIONAL IMPORT ORIGIN EXPOSURE ({use_year})", className="card-title-upper"),
                     dcc.Graph(figure=fig_donut, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
 
             dbc.Col([
                 html.Div([
-                    html.H6("TOP NON-EU STRATEGIC SUPPLIERS", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.4: TOP {len(non_eu_sub)} NON-EU STRATEGIC SUPPLIERS ({use_year})", className="card-title-upper"),
                     dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
 
             dbc.Col([
                 html.Div([
-                    html.H6("EUROPEAN SINGLE MARKET INTEGRATION", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.5: EUROPEAN SINGLE MARKET INTEGRATION ({min_kpi_yr}–{max_kpi_yr})", className="card-title-upper"),
                     dcc.Graph(figure=fig_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
         ], className="mb-4"),
 
-        # Section 2: Critical Supply Baskets & Concentration
+        # Section 1.2: Critical Supply Baskets & Concentration
         create_section_header(
-            f"CRITICAL IMPORT BASKETS & SUPPLIER CONCENTRATION ({use_year})",
-            "Supplier concentration estimated by Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
-            badge_text="Merchandise Baskets",
-            badge_color=STATEC_NAVY,
-            info_title="Herfindahl-Hirschman Index (HHI) Calculation",
+            f"1.2 CRITICAL IMPORT BASKETS & SUPPLIER CONCENTRATION ({use_year})",
+            info_title="Herfindahl-Hirschman Index (HHI) Methodology",
             info_content=[
-                html.P("The HHI measures supplier concentration as the sum of squared market shares of supplying nations:", className="fw-semibold mb-1"),
-                html.Ul([
-                    html.Li("HHI < 1,500: Low concentration"),
-                    html.Li("1,500 – 2,500: Moderate concentration"),
-                    html.Li("HHI > 2,500: High concentration"),
-                ], className="ps-3 mb-0")
+                html.P("The Herfindahl-Hirschman Index (HHI) measures supplier concentration as the sum of squared market shares of supplying partner nations (ranging from 0 to 10,000):", className="infobox-intro-text"),
+                create_infobox_item("< 1,500", "Low Concentration / Diversified", "Broad supplier base across global markets; minimal vulnerability to single-country disruptions.", badge_variant="green"),
+                create_infobox_item("1,500 – 2,500", "Moderate Concentration", "Moderate reliance on leading suppliers; recommended monitoring for critical intermediate goods.", badge_variant="yellow"),
+                create_infobox_item("> 2,500", "High Concentration / Vulnerable", "Elevated dependency on dominant supplying countries; acute vulnerability to trade bottleneck shocks.", badge_variant="red"),
             ]
         ),
 
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6(f"IMPORT BASKETS SUPPLIER CONCENTRATION SCORE (HHI) IN {use_year}", className="card-title-upper"),
+                    html.H6(f"FIGURE 1.6: IMPORT BASKETS CONCENTRATION RANKING (HHI) IN {use_year}", className="card-title-upper"),
                     dcc.Graph(figure=fig_comp, config={"displayModeBar": False})
                 ], className="dash-card")
-            ], md=12)
+            ], md=6),
+            dbc.Col([
+                html.Div([
+                    html.H6(f"FIGURE 1.7: STRATEGIC VULNERABILITY MATRIX: CONCENTRATION VS VOLUME IN {use_year}", className="card-title-upper"),
+                    dcc.Graph(figure=fig_matrix, config={"displayModeBar": False})
+                ], className="dash-card")
+            ], md=6),
         ]),
 
         dbc.Row(cards)
@@ -671,28 +751,18 @@ def render_tab_resilience(selected_year):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# COMPATIBILITY ALIASES FOR MERGED RESILIENCE VIEW
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_macro(selected_year):
-    return render_tab_resilience(selected_year)
-
-
-def render_tab_geopolitics(selected_year):
-    return render_tab_resilience(selected_year)
-
-
-
-def render_tab_stress(selected_year=None):
-    return render_tab_resilience(selected_year)
-
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 5: Q1 — TRADING PARTNERS & WORLD FLOW
+# TAB 2: Q1 & Q4 — TRADING PARTNERS & BILATERAL DRILL-DOWN
 # ───────────────────────────────────────────────────────────────────────────
 def render_tab_partners(selected_year):
     partners_df = load_partner_rankings()
-    sub_yr = partners_df[(partners_df["year"] == selected_year) & (partners_df["flow"] == "IMPORT")].sort_values("rank")
+    if not partners_df.empty and "year" in partners_df.columns:
+        partners_df = partners_df[(partners_df["year"] >= START_YEAR) & (partners_df["year"] <= END_YEAR)]
+
+    use_year = selected_year
+    if not partners_df.empty and (use_year not in partners_df["year"].values):
+        use_year = int(partners_df["year"].max())
+
+    sub_yr = partners_df[(partners_df["year"] == use_year) & (partners_df["flow"] == "IMPORT")].sort_values("rank")
     if not sub_yr.empty:
         top_p = sub_yr["partner_code"].head(30).tolist()
     else:
@@ -701,10 +771,16 @@ def render_tab_partners(selected_year):
     def_q4_p = top_p[0] if top_p else "DE"
 
     return html.Div([
-        # ── Q1 Section: Main Trading Partners & Bilateral Flows ──
+        # ── Section 2.1: Main Trading Partners & Bilateral Flows ──
         create_section_header(
-            "Q1: TRADING PARTNERS & BILATERAL FLOWS",
-            "Who are Luxembourg's main trading partners? How have they evolved over time? Click any country bar below to inspect top products and detailed tariff lines."
+            f"2.1 MAIN TRADING PARTNERS & BILATERAL FLOWS ({use_year})",
+            info_title="Bilateral Trade Accounting & Methodology",
+            info_content=[
+                html.P("Official international trade in goods statistics (Eurostat DS-045409 / Comext) compiled under UN IMTS standards:", className="infobox-intro-text"),
+                create_infobox_item("CIF / FOB", "Statistical Valuation Standards", "Imports are valued CIF (Cost, Insurance, Freight) at the Luxembourg border; Exports are valued FOB (Free on Board).", badge_variant="blue"),
+                create_infobox_item("Transit", "Country of Consignment vs Origin", "Intra-EU records partner of dispatch/consignment, reflecting major Antwerp/Rotterdam logistics transit corridors.", badge_variant="blue"),
+                create_infobox_item("Single Market", "Intra-EU vs Extra-EU Trading Blocs", "Distinguishes frictionless European Single Market supply integrations from global third-country dependencies.", badge_variant="blue"),
+            ]
         ),
 
         # Controls Ribbon (Imports always on left & default)
@@ -755,8 +831,7 @@ def render_tab_partners(selected_year):
                 html.Div([
                     html.Div([
                         html.H6(id="q1-barchart-title", className="card-title-upper mb-0"),
-                        html.Span("💡 Click any bar to inspect country products & tariff lines", className="small text-primary fw-bold")
-                    ], className="d-flex justify-content-between align-items-center mb-2"),
+                    ], className="mb-2"),
                     dcc.Graph(id="q1-top-partners-bar", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=7),
@@ -772,7 +847,7 @@ def render_tab_partners(selected_year):
                 html.Div([
                     html.Div([
                         html.Div([
-                            html.H6("GLOBAL GEOGRAPHIC FLOW MAP", className="card-title-upper mb-0"),
+                            html.H6("FIGURE 2.2: GLOBAL GEOGRAPHIC FLOW MAP", className="card-title-upper mb-0"),
                             html.Small("Hover to view country trade volume • Click to select", className="kpi-caption")
                         ]),
                         html.Div([
@@ -804,11 +879,8 @@ def render_tab_partners(selected_year):
             ], md=12)
         ], className="mb-4"),
 
-        # ── Q4 Section: Product Breakdown per Country (Tariff Drill-Down) ──
-        create_section_header(
-            f"Q4: PRODUCT BREAKDOWN PER COUNTRY ({selected_year})",
-            "Granular product breakdown for the selected partner country across HS2 Chapters, HS4 Subheadings, and 8-digit CN8 tariff lines. Select or click any country above to update."
-        ),
+        # ── Section 2.2: Product Breakdown per Partner (Tariff Drill-Down) ──
+        create_section_header(f"2.2 BILATERAL PRODUCT BREAKDOWN PER PARTNER ({use_year})"),
 
         html.Div([
             dbc.Row([
@@ -959,9 +1031,14 @@ def update_q1_selected_partner(bar_click, map_click, flow, year, current_p):
 )
 def update_q1_charts(flow, scope, metric, selected_partner, is_expanded, year):
     partners_df = load_partner_rankings()
-    sub = partners_df[(partners_df["year"] == year) & (partners_df["flow"] == flow)].copy()
-    if sub.empty:
-        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == flow)].copy()
+    if not partners_df.empty and "year" in partners_df.columns:
+        partners_df = partners_df[(partners_df["year"] >= START_YEAR) & (partners_df["year"] <= END_YEAR)]
+
+    use_year = year
+    sub = partners_df[(partners_df["year"] == use_year) & (partners_df["flow"] == flow)].copy()
+    if sub.empty and not partners_df.empty:
+        use_year = int(partners_df["year"].max())
+        sub = partners_df[(partners_df["year"] == use_year) & (partners_df["flow"] == flow)].copy()
 
     top10 = sub.sort_values("rank").head(10).copy()
     top10["country_name_en"] = top10["partner_code"].apply(get_country_name)
@@ -999,7 +1076,14 @@ def update_q1_charts(flow, scope, metric, selected_partner, is_expanded, year):
         colorscale=[[0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"], [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]],
         zmin=cmin, zmax=cmax,
         showscale=True,
-        colorbar=dict(title=dict(text="Log10 €", font=dict(size=10)), thickness=10, len=0.7)
+        colorbar=dict(
+            title=dict(text="Trade Flow", font=dict(size=10, family="Inter, sans-serif")),
+            thickness=10,
+            len=0.7,
+            tickvals=[6.0, 7.0, 8.0, 9.0, 10.0],
+            ticktext=["€1M", "€10M", "€100M", "€1B", "€10B"],
+            tickfont=dict(size=9, family="Inter, sans-serif")
+        )
     ))
 
     sel_iso3 = ISO2_TO_ISO3.get(selected_partner)
@@ -1018,7 +1102,7 @@ def update_q1_charts(flow, scope, metric, selected_partner, is_expanded, year):
     map_height = 520 if is_expanded else 290
     fig_map.update_layout(height=map_height, margin=dict(l=0, r=0, t=10, b=0), clickmode="event+select")
 
-    bar_title = f"Top 10 {flow.capitalize()} Partners in {year}"
+    bar_title = f"FIGURE 2.1: TOP {len(top10)} {flow.upper()} PARTNERS IN {use_year}"
     return bar_title, fig_bar, fig_map, {"height": f"{map_height}px"}
 
 
@@ -1033,9 +1117,14 @@ def update_q1_spotlight_panel(partner_code, flow, year):
     country_name = get_country_name(partner_code)
 
     pp_df = load_product_partners()
-    sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)]
-    if sub_prod.empty:
-        sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())]
+    if not pp_df.empty and "year" in pp_df.columns:
+        pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
+
+    use_year = year
+    sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)]
+    if sub_prod.empty and not pp_df.empty:
+        use_year = int(pp_df["year"].max())
+        sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)]
 
     top_prods_bars = []
     tot_p_val = sub_prod["value_eur"].sum() if not sub_prod.empty else 0
@@ -1046,7 +1135,7 @@ def update_q1_spotlight_panel(partner_code, flow, year):
             sh = (p["value_eur"] / tot_p_val * 100) if tot_p_val > 0 else 0
             top_prods_bars.append(html.Div([
                 html.Div([
-                    html.Span(f"Ch. {p['hs2_code']}: {p['hs2_name'][:30]}", className="spotlight-stat-label"),
+                    html.Span(f"{p['hs2_code']}: {p['hs2_name'][:30]}", className="spotlight-stat-label"),
                     html.Span(f"{fmt_eur(p['value_eur'])} ({sh:.1f}%)", className="spotlight-stat-val")
                 ], className="d-flex justify-content-between mb-1"),
                 dbc.Progress(value=sh, color="primary" if flow == "EXPORT" else "dark", className="progress-xs mb-2")
@@ -1054,11 +1143,24 @@ def update_q1_spotlight_panel(partner_code, flow, year):
     else:
         top_prods_bars.append(html.P("Detailed product breakdown not available.", className="text-muted small"))
 
-    # 25-Year bilateral trend
+    # Bilateral historical trajectory and bilateral balance
     partners_df = load_partner_rankings()
+    if not partners_df.empty and "year" in partners_df.columns:
+        partners_df = partners_df[(partners_df["year"] >= START_YEAR) & (partners_df["year"] <= END_YEAR)]
+
+    exp_sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == "EXPORT") & (partners_df["year"] == use_year)]
+    imp_sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == "IMPORT") & (partners_df["year"] == use_year)]
+    exp_val = exp_sub["value_eur"].iloc[0] if not exp_sub.empty else 0.0
+    imp_val = imp_sub["value_eur"].iloc[0] if not imp_sub.empty else 0.0
+    bilat_bal = exp_val - imp_val
+
     hist_sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == flow)].sort_values("year")
     fig_hist = go.Figure()
     if not hist_sub.empty:
+        min_hist = int(hist_sub["year"].min())
+        max_hist = int(hist_sub["year"].max())
+        span_hist = max_hist - min_hist + 1
+        traj_title = f"Figure 2.3: {span_hist}-Year Bilateral Trajectory with {country_name} ({min_hist}–{max_hist}) (€M)"
         fig_hist.add_trace(go.Scatter(
             x=hist_sub["year"], y=hist_sub["value_eur"] / 1e6,
             mode="lines+markers",
@@ -1066,7 +1168,10 @@ def update_q1_spotlight_panel(partner_code, flow, year):
             marker=dict(size=4),
             hovertemplate="Year %{x}: €%{y:,.1f}M<extra></extra>"
         ))
-    apply_plot_theme(fig_hist, title=f"25-Year Bilateral Trajectory with {country_name} (€M)")
+        fig_hist.update_xaxes(range=[min_hist - 0.2, max_hist + 0.2])
+    else:
+        traj_title = f"Figure 2.3: Bilateral Trajectory with {country_name} (€M)"
+    apply_plot_theme(fig_hist, title=traj_title)
     fig_hist.update_layout(height=180, margin=dict(l=10, r=20, t=30, b=25))
 
     return html.Div([
@@ -1074,12 +1179,21 @@ def update_q1_spotlight_panel(partner_code, flow, year):
             html.Div([
                 create_icon_badge("bi bi-geo-alt-fill", color="#B45309", bg="#FEF3C7", size=15, box_size=32),
                 html.Div([
-                    html.H6(f"{country_name} ({partner_code})", className="card-title-upper mb-0"),
-                    html.Small(f"Total {flow.capitalize()}: {fmt_eur(tot_p_val)} in {year}", className="text-muted small")
+                    html.Div([
+                        html.H6(f"{country_name} ({partner_code})", className="card-title-upper mb-0 me-2"),
+                        html.Span(
+                            f"Net: {fmt_eur(bilat_bal)} ({'Surplus' if bilat_bal >= 0 else 'Deficit'})",
+                            className=f"badge {'bg-success' if bilat_bal >= 0 else 'bg-secondary'} px-2 py-1 small"
+                        )
+                    ], className="d-flex align-items-center flex-wrap gap-1"),
+                    html.Small(f"Total {flow.capitalize()}: {fmt_eur(tot_p_val)} in {use_year}", className="text-muted small")
                 ], className="ms-2")
             ], className="d-flex align-items-center mb-3"),
 
-            html.Span(f"TOP PRODUCTS TRADED WITH {country_name.upper()}", className="spotlight-section-title"),
+            html.Span(
+                f"TOP {len(top_prods)} PRODUCTS TRADED WITH {country_name.upper()} ({use_year})" if not sub_prod.empty else f"TOP PRODUCTS TRADED WITH {country_name.upper()}",
+                className="spotlight-section-title"
+            ),
             html.Div(top_prods_bars, className="mb-3"),
 
             dcc.Graph(figure=fig_hist, config={"displayModeBar": False})
@@ -1092,22 +1206,35 @@ def update_q1_spotlight_panel(partner_code, flow, year):
 # ───────────────────────────────────────────────────────────────────────────
 def render_tab_products(selected_year):
     prod_df = load_product_rankings()
+    if not prod_df.empty and "year" in prod_df.columns:
+        prod_df = prod_df[(prod_df["year"] >= START_YEAR) & (prod_df["year"] <= END_YEAR)]
+
+    use_year = selected_year
+    if not prod_df.empty and (use_year not in prod_df["year"].values):
+        use_year = int(prod_df["year"].max())
+
     q3_options = []
     def_q3_prod = "87"
     if not prod_df.empty:
         u = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
-        q3_options = [{"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
-        sub_yr = prod_df[(prod_df["year"] == selected_year) & (prod_df["flow"] == "IMPORT")].sort_values("value_eur", ascending=False)
+        q3_options = [{"label": f"{r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
+        sub_yr = prod_df[(prod_df["year"] == use_year) & (prod_df["flow"] == "IMPORT")].sort_values("value_eur", ascending=False)
         if not sub_yr.empty:
             def_q3_prod = str(sub_yr.iloc[0]["hs2_code"])
         elif q3_options:
             def_q3_prod = q3_options[0]["value"]
 
     return html.Div([
-        # ── Q2 Section: Main Product Categories & Structural Shift ──
+        # ── Section 3.1: Product Categories & Structural Shift ──
         create_section_header(
-            f"Q2: MAIN PRODUCT CATEGORIES & STRUCTURAL SHIFT ({selected_year})",
-            "What are the main categories of goods traded? How have these patterns transformed over 25 years (from steel dominance to advanced automotive, machinery, and pharma)? Click any product bar to see its top partner countries."
+            f"3.1 PRODUCT CATEGORIES & STRUCTURAL SHIFT ({use_year})",
+            info_title="Product Classification & Nomenclature Hierarchy",
+            info_content=[
+                html.P("Merchandise trade is classified hierarchically under the European Combined Nomenclature (CN) and Harmonized System (HS):", className="infobox-intro-text"),
+                create_infobox_item("HS-2", "Chapters (2-digit)", "Broad economic sectors (e.g. Ch. 84 Machinery, Ch. 85 Electronics, Ch. 87 Vehicles, Ch. 27 Mineral Fuels).", badge_variant="blue"),
+                create_infobox_item("HS-4", "Headings (4-digit)", "Intermediate product groups tracking structural diversification, capital goods, and supply transitions.", badge_variant="blue"),
+                create_infobox_item("CN-8", "Subheadings (8-digit)", "Granular product lines identifying critical single-product dependencies and strategic supply bottlenecks.", badge_variant="blue"),
+            ]
         ),
 
         html.Div([
@@ -1147,6 +1274,7 @@ def render_tab_products(selected_year):
                         options=[
                             {"label": "HS2 Chapters (2-Digit)", "value": 2},
                             {"label": "HS4 Subheadings (4-Digit)", "value": 4},
+                            {"label": "CN8 Tariff Lines (8-Digit)", "value": 8},
                         ],
                         value=2,
                         inline=True,
@@ -1166,8 +1294,7 @@ def render_tab_products(selected_year):
                 html.Div([
                     html.Div([
                         html.H6(id="q2-barchart-title", className="card-title-upper mb-0"),
-                        html.Span("💡 Click any bar to inspect product suppliers & partner origins", className="small text-primary fw-bold")
-                    ], className="d-flex justify-content-between align-items-center mb-2"),
+                    ], className="mb-2"),
                     dcc.Graph(id="q2-top-products-bar", config={"displayModeBar": False}, className="chart-h-390")
                 ], className="dash-card")
             ], md=7),
@@ -1180,17 +1307,29 @@ def render_tab_products(selected_year):
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6(id="q2-shift-chart-title", className="card-title-upper"),
+                    html.Div([
+                        html.H6(id="q2-shift-chart-title", className="card-title-upper mb-0"),
+                        dbc.RadioItems(
+                            id="q2-shift-metric-radio",
+                            options=[
+                                {"label": "Volume (€M)", "value": "value"},
+                                {"label": "Market Share (%)", "value": "share"},
+                            ],
+                            value="value",
+                            inline=True,
+                            className="btn-group",
+                            input_class_name="btn-check",
+                            label_class_name="btn btn-outline-secondary btn-sm px-2 py-0 small",
+                            label_checked_class_name="btn btn-secondary btn-sm px-2 py-0 text-white fw-bold small",
+                        )
+                    ], className="d-flex justify-content-between align-items-center mb-2"),
                     dcc.Graph(id="q2-shift-chart", config={"displayModeBar": False}, className="chart-h-300")
                 ], className="dash-card")
             ], md=12)
         ], className="mb-4"),
 
-        # ── Q3 Section: Principal Partners by Product Category ──
-        create_section_header(
-            f"Q3: PRINCIPAL PARTNERS BY PRODUCT CATEGORY ({selected_year})",
-            "For a given product category, who are Luxembourg's principal trading partners? Inspect supplier concentration (HHI) and geographic origin breakdown. Select or click any product above to update."
-        ),
+        # ── Section 3.2: Principal Partners by Product Category ──
+        create_section_header(f"3.2 PRINCIPAL PARTNERS BY PRODUCT CATEGORY ({use_year})"),
 
         html.Div([
             dbc.Row([
@@ -1245,7 +1384,7 @@ def render_tab_products(selected_year):
 
             dbc.Col([
                 html.Div([
-                    html.H6("SUPPLIER GEOGRAPHIC DISTRIBUTION", className="card-title-upper"),
+                    html.H6("FIGURE 3.5: SUPPLIER GEOGRAPHIC DISTRIBUTION", className="card-title-upper"),
                     dcc.Graph(id="q3-suppliers-map", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=5)
@@ -1265,7 +1404,14 @@ def render_tab_products(selected_year):
 def update_q2_selected_product(bar_click, flow, granularity, basket, year, current_prod):
     chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
 
-    if granularity == 4:
+    if granularity == 8:
+        hs8_df = load_hs8_product_rankings()
+        sub = hs8_df[(hs8_df["year"] == year) & (hs8_df["flow"] == flow)]
+        if chapters:
+            sub = sub[sub["hs2_parent"].astype(str).str.zfill(2).isin(chapters) | sub["hs2_parent"].astype(str).isin(chapters)]
+        sub = sub.sort_values("value_eur", ascending=False)
+        default_prod = str(sub.iloc[0]["hs8_code"]) if not sub.empty else "87032319"
+    elif granularity == 4:
         hs4_df = load_hs4_product_rankings()
         sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)]
         if chapters:
@@ -1307,16 +1453,33 @@ def update_q2_selected_product(bar_click, flow, granularity, basket, year, curre
     Input("q2-granularity-radio", "value"),
     Input("q2-basket-dropdown", "value"),
     Input("q2-selected-product", "data"),
-    Input("global-year-dropdown", "value")
+    Input("global-year-dropdown", "value"),
+    Input("q2-shift-metric-radio", "value")
 )
-def update_q2_charts(flow, granularity, basket, selected_prod, year):
+def update_q2_charts(flow, granularity, basket, selected_prod, year, shift_metric="value"):
     chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
 
-    if granularity == 4:
+    if granularity == 8:
+        hs8_df = load_hs8_product_rankings()
+        hs8_df = hs8_df[(hs8_df["year"] >= START_YEAR) & (hs8_df["year"] <= END_YEAR)]
+        max_h_yr = int(hs8_df["year"].max()) if not hs8_df.empty else END_YEAR
+        use_year = year if (not hs8_df.empty and year in hs8_df["year"].values) else max_h_yr
+        sub = hs8_df[(hs8_df["year"] == use_year) & (hs8_df["flow"] == flow)].copy()
+        if sub.empty and not hs8_df.empty:
+            sub = hs8_df[(hs8_df["year"] == max_h_yr) & (hs8_df["flow"] == flow)].copy()
+        if chapters:
+            sub = sub[sub["hs2_parent"].astype(str).str.zfill(2).isin(chapters) | sub["hs2_parent"].astype(str).isin(chapters)]
+        top = sub.sort_values("value_eur", ascending=False).head(10).copy()
+        top["label"] = "CN " + top["hs8_code"] + ": " + top["hs8_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
+        code_col = top["hs8_code"]
+    elif granularity == 4:
         hs4_df = load_hs4_product_rankings()
-        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].copy()
-        if sub.empty:
-            sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
+        hs4_df = hs4_df[(hs4_df["year"] >= START_YEAR) & (hs4_df["year"] <= END_YEAR)]
+        max_h_yr = int(hs4_df["year"].max()) if not hs4_df.empty else END_YEAR
+        use_year = year if (not hs4_df.empty and year in hs4_df["year"].values) else max_h_yr
+        sub = hs4_df[(hs4_df["year"] == use_year) & (hs4_df["flow"] == flow)].copy()
+        if sub.empty and not hs4_df.empty:
+            sub = hs4_df[(hs4_df["year"] == max_h_yr) & (hs4_df["flow"] == flow)].copy()
         if chapters:
             sub = sub[sub["hs4_code"].astype(str).str[:2].isin(chapters)]
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
@@ -1324,13 +1487,16 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year):
         code_col = top["hs4_code"]
     else:
         prod_df = load_product_rankings()
-        sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == flow)].copy()
-        if sub.empty:
-            sub = prod_df[(prod_df["year"] == prod_df["year"].max()) & (prod_df["flow"] == flow)].copy()
+        prod_df = prod_df[(prod_df["year"] >= START_YEAR) & (prod_df["year"] <= END_YEAR)]
+        max_p_yr = int(prod_df["year"].max()) if not prod_df.empty else END_YEAR
+        use_year = year if (not prod_df.empty and year in prod_df["year"].values) else max_p_yr
+        sub = prod_df[(prod_df["year"] == use_year) & (prod_df["flow"] == flow)].copy()
+        if sub.empty and not prod_df.empty:
+            sub = prod_df[(prod_df["year"] == max_p_yr) & (prod_df["flow"] == flow)].copy()
         if chapters:
             sub = sub[sub["hs2_code"].astype(str).str[:2].isin(chapters)]
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
-        top["label"] = "Ch. " + top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
+        top["label"] = top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
         code_col = top["hs2_code"]
 
     bar_colors = [STATEC_YELLOW if str(c) == str(selected_prod) else (SECONDARY if flow == "IMPORT" else PRIMARY) for c in code_col]
@@ -1348,11 +1514,12 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year):
     apply_plot_theme(fig_bar, x_title="Million Euros (€M)")
     max_val_m = (top["value_eur"] / 1e6).max() if not top.empty else 100
     fig_bar.update_xaxes(range=[0, max_val_m * 1.25])
-    fig_bar.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
+    fig_bar.update_layout(margin=dict(l=220 if granularity in (4, 8) else 190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     # Structural shift chart: dynamically track top product categories for this flow and basket
     all_prod = load_product_rankings()
-    sub_yr = all_prod[(all_prod["year"] == year) & (all_prod["flow"] == flow)]
+    all_prod = all_prod[(all_prod["year"] >= START_YEAR) & (all_prod["year"] <= END_YEAR)]
+    sub_yr = all_prod[(all_prod["year"] == use_year) & (all_prod["flow"] == flow)]
     if chapters:
         sub_yr = sub_yr[sub_yr["hs2_code"].astype(str).str[:2].isin(chapters)]
     sub_yr = sub_yr.sort_values("value_eur", ascending=False)
@@ -1363,29 +1530,47 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year):
         ch_names = {r["hs2_code"]: f"{r['hs2_name'][:20]} ({r['hs2_code']})" for _, r in top5_chs.iterrows()}
     else:
         key_chs = chapters[:5] if chapters else ["72", "84", "87", "39", "30"]
-        ch_names = {ch: f"Ch. {ch}" for ch in key_chs}
+        ch_names = {ch: f"{ch}" for ch in key_chs}
+
+    shift_metric = str(shift_metric or "value").lower()
+    is_share = (shift_metric == "share")
 
     fig_shift = go.Figure()
     for ch in key_chs:
         c_sub = all_prod[(all_prod["hs2_code"] == ch) & (all_prod["flow"] == flow)].sort_values("year")
         if not c_sub.empty:
+            if is_share:
+                y_vals = c_sub["product_share_pct"]
+                h_tmpl = "%{x}: %{y:.1f}%<extra></extra>"
+            else:
+                y_vals = c_sub["value_eur"] / 1e6
+                h_tmpl = "%{x}: €%{y:,.1f}M<extra></extra>"
+
             fig_shift.add_trace(go.Scatter(
-                x=c_sub["year"], y=c_sub["value_eur"] / 1e6,
+                x=c_sub["year"], y=y_vals,
                 name=ch_names.get(ch, ch),
                 mode="lines+markers",
                 line=dict(width=2.5),
                 marker=dict(size=4),
-                hovertemplate="%{x}: €%{y:,.1f}M<extra></extra>"
+                hovertemplate=h_tmpl
             ))
-    apply_plot_theme(fig_shift, y_title="Million Euros (€M)")
+
+    y_axis_title = "Market Share of Flow (%)" if is_share else "Million Euros (€M)"
+    apply_plot_theme(fig_shift, y_title=y_axis_title)
+    min_shift_yr = int(all_prod["year"].min()) if not all_prod.empty else START_YEAR
+    max_shift_yr = int(all_prod["year"].max()) if not all_prod.empty else END_YEAR
+    fig_shift.update_xaxes(range=[min_shift_yr - 0.2, max_shift_yr + 0.2])
     fig_shift.update_layout(
         margin=dict(l=10, r=20, t=25, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
     )
 
     basket_suffix = f" [{RESILIENCE_BASKETS.get(basket, {}).get('short_name', basket)}]" if (basket and basket != "ALL") else ""
-    barchart_title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}{basket_suffix}"
-    shift_title = f"25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT {flow.upper()}S (2000–2025){basket_suffix}"
+    level_lbl = "Tariff Lines (CN8)" if granularity == 8 else ("Subheadings (HS4)" if granularity == 4 else "Chapters (HS2)")
+    barchart_title = f"FIGURE 3.1: TOP {len(top)} TRADED PRODUCT {level_lbl.upper()} IN {use_year}{basket_suffix}"
+    span_shift_yr = max_shift_yr - min_shift_yr + 1
+    metric_label = "MARKET SHARE EVOLUTION" if is_share else "STRUCTURAL TRANSFORMATION"
+    shift_title = f"FIGURE 3.2: {span_shift_yr}-YEAR {metric_label} OF PRODUCT {flow.upper()}S ({min_shift_yr}–{max_shift_yr}){basket_suffix}"
     return barchart_title, fig_bar, fig_shift, shift_title
 
 
@@ -1396,15 +1581,37 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year):
     Input("global-year-dropdown", "value")
 )
 def update_q2_spotlight_panel(prod_code, flow, year):
-    prod_code = str(prod_code or "87")[:2].zfill(2)
+    raw_code = str(prod_code or "87").strip()
+    prod_code = raw_code[:2].zfill(2)
 
     pp_df = load_product_partners()
-    sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)]
-    if sub.empty:
-        sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())]
+    pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
+    max_pp_yr = int(pp_df["year"].max()) if not pp_df.empty else END_YEAR
+    use_year = year if (not pp_df.empty and year in pp_df["year"].values) else max_pp_yr
+
+    sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)]
+    if sub.empty and not pp_df.empty:
+        sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == max_pp_yr)]
 
     prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Chapter {prod_code}"
     tot_val = sub["value_eur"].sum() if not sub.empty else 0
+
+    hs8_info = None
+    if len(raw_code) == 8:
+        try:
+            hs8_df = load_hs8_product_rankings()
+            match = hs8_df[(hs8_df["hs8_code"] == raw_code) & (hs8_df["flow"] == flow) & (hs8_df["year"] == use_year)]
+            if match.empty:
+                match = hs8_df[(hs8_df["hs8_code"] == raw_code) & (hs8_df["flow"] == flow)]
+            if not match.empty:
+                hs8_row = match.iloc[0]
+                hs8_info = {
+                    "code": raw_code,
+                    "name": str(hs8_row["hs8_name"]),
+                    "val": float(hs8_row["value_eur"])
+                }
+        except Exception:
+            pass
 
     top_suppliers = []
     if not sub.empty:
@@ -1433,13 +1640,20 @@ def update_q2_spotlight_panel(prod_code, flow, year):
     else:
         hhi_score = 0.0
 
+    if hs8_info:
+        header_title = f"Figure 3.3: CN {hs8_info['code']} — {hs8_info['name'][:24]}"
+        header_sub = f"Tariff Line: {fmt_eur(hs8_info['val'])} | Parent Chapter {prod_code}: {fmt_eur(tot_val)} in {use_year}"
+    else:
+        header_title = f"Figure 3.3: Chapter {prod_code} — {prod_name[:24]}"
+        header_sub = f"Total Traded Value: {fmt_eur(tot_val)} in {use_year}"
+
     return html.Div([
         html.Div([
             html.Div([
                 create_icon_badge("bi bi-box-seam-fill", color="#065F46", bg="#DCFCE7", size=15, box_size=32),
                 html.Div([
-                    html.H6(f"Ch. {prod_code} — {prod_name[:26]}", className="card-title-upper mb-0"),
-                    html.Small(f"Total Traded Value: {fmt_eur(tot_val)} in {year}", className="text-muted small")
+                    html.H6(header_title, className="card-title-upper mb-0"),
+                    html.Small(header_sub, className="text-muted small")
                 ], className="ms-2")
             ], className="d-flex align-items-center mb-2"),
 
@@ -1448,17 +1662,13 @@ def update_q2_spotlight_panel(prod_code, flow, year):
                 get_concentration_badge(hhi_score)
             ], className="d-flex align-items-center justify-content-between mb-3"),
 
-            html.Span(f"TOP PARTNER COUNTRIES FOR CH. {prod_code}", className="spotlight-section-title"),
+            html.Span(f"TOP PARTNER COUNTRIES FOR {prod_code}", className="spotlight-section-title"),
             html.Div(top_suppliers)
         ], className="spotlight-card")
     ])
 
 
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 7: Q3 — PRINCIPAL PARTNERS FOR A GIVEN PRODUCT
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_q3_product_partners(selected_year):
-    return render_tab_products(selected_year)
+
 
 
 @callback(
@@ -1484,7 +1694,7 @@ def update_q3_product_options(basket):
     chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
     if chapters:
         u = u[u["hs2_code"].astype(str).str[:2].isin(chapters)]
-    return [{"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
+    return [{"label": f"{r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
 
 
 @callback(
@@ -1541,9 +1751,13 @@ def sync_q3_flow_from_q2(flow):
 def update_q3_charts(product_code, flow, year):
     product_code = str(product_code or "87")[:2].zfill(2)
     pp_df = load_product_partners()
-    sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)].copy()
-    if sub.empty:
-        sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())].copy()
+    pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
+    max_pp_yr = int(pp_df["year"].max()) if not pp_df.empty else END_YEAR
+    use_year = year if (not pp_df.empty and year in pp_df["year"].values) else max_pp_yr
+
+    sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)].copy()
+    if sub.empty and not pp_df.empty:
+        sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == max_pp_yr)].copy()
 
     top10 = sub.sort_values("value_eur", ascending=False).head(10).copy()
     top10["country_name_en"] = top10["partner_code"].apply(get_country_name)
@@ -1576,16 +1790,12 @@ def update_q3_charts(product_code, flow, year):
     apply_map_theme(fig_map, scope="europe")
     fig_map.update_layout(margin=dict(l=0, r=0, t=10, b=0))
 
-    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Ch. {product_code}"
-    title = f"Top 10 Partners for Ch. {product_code} ({prod_name[:25]}) in {year}"
+    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Product {product_code}"
+    title = f"FIGURE 3.4: TOP {len(top10)} PARTNERS FOR {product_code} ({prod_name[:25].upper()}) IN {use_year}"
     return title, fig_bar, fig_map
 
 
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 8: Q4 — DETAILED PARTNER TARIFF DRILL-DOWN (HS2 → HS4 → CN8)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_q4_drilldown(selected_year):
-    return render_tab_partners(selected_year)
+
 
 
 @callback(
@@ -1623,6 +1833,7 @@ def sync_q4_flow_from_q1(flow):
 def update_q4_chart(partner_code, flow, level, threshold, basket, year):
     partner_code = str(partner_code or "DE").upper()
     level = int(level or 4)
+    threshold = threshold or 15
 
     if level == 8:
         df = load_drilldown_lvl8()
@@ -1641,11 +1852,14 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
     if sub.empty:
         # Fallback to product_partners (which covers all 237 partner countries)
         pp_df = load_product_partners()
-        sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)].copy()
+        pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
+        max_pp_yr = int(pp_df["year"].max()) if not pp_df.empty else END_YEAR
+        use_year = year if (not pp_df.empty and year in pp_df["year"].values) else max_pp_yr
+        sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)].copy()
         if sub_pp.empty:
             sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow)].copy()
             if not sub_pp.empty:
-                sub_pp = sub_pp[sub_pp["year"] == sub_pp["year"].max()]
+                sub_pp = sub_pp[sub_pp["year"] == max_pp_yr]
         if not sub_pp.empty:
             sub = pd.DataFrame({
                 "partner_code": sub_pp["partner_code"],
@@ -1666,6 +1880,8 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
         if chapters and not sub.empty:
             sub = sub[sub["product_code"].astype(str).str[:2].isin(chapters)]
 
+    use_year = year or END_YEAR
+
     if sub.empty:
         fig = go.Figure()
         apply_plot_theme(fig, x_title="Million Euros (€M)")
@@ -1674,7 +1890,7 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
             xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
             font=dict(size=13, color=TEXT_MUTED, family="Inter, sans-serif")
         )
-        return f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()}){basket_suffix}", fig
+        return f"FIGURE 2.4: {get_country_name(partner_code).upper()} ({partner_code}) — LEVEL {level} TARIFF BREAKDOWN ({flow.upper()}) IN {use_year}{basket_suffix}", fig
 
     if threshold in [15, 25]:
         sub = sub.sort_values("value_eur", ascending=False).head(int(threshold)).copy()
@@ -1697,7 +1913,7 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
     fig.update_xaxes(range=[0, max_val_m * 1.25])
     fig.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    title = f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()}){basket_suffix}"
+    title = f"FIGURE 2.4: {get_country_name(partner_code).upper()} ({partner_code}) — LEVEL {level} TARIFF BREAKDOWN ({flow.upper()}) IN {use_year}{basket_suffix}"
     return title, fig
 
 
@@ -1706,33 +1922,35 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
 # ───────────────────────────────────────────────────────────────────────────
 BENCHMARK_PRODUCT_OPTIONS = [
     {"label": "All Merchandise Trade (Total)", "value": "TOTAL"},
-    {"label": "Ch. 87 — Vehicles & Automotive Equipment", "value": "87"},
-    {"label": "Ch. 84 — Machinery & Mechanical Appliances", "value": "84"},
-    {"label": "Ch. 85 — Electrical Machinery & Electronics", "value": "85"},
-    {"label": "Ch. 30 — Pharmaceutical Products", "value": "30"},
-    {"label": "Ch. 72 — Iron and Steel", "value": "72"},
-    {"label": "Ch. 73 — Articles of Iron or Steel", "value": "73"},
-    {"label": "Ch. 27 — Mineral Fuels & Energy", "value": "27"},
-    {"label": "Ch. 39 — Plastics and Articles Thereof", "value": "39"},
-    {"label": "Ch. 90 — Optical, Medical & Precision Instruments", "value": "90"},
-    {"label": "Ch. 04 — Dairy Produce, Honey & Edible Products", "value": "04"},
-    {"label": "Ch. 22 — Beverages, Spirits and Vinegar", "value": "22"},
-    {"label": "Ch. 10 — Cereals and Grains", "value": "10"},
-    {"label": "Ch. 76 — Aluminium and Articles Thereof", "value": "76"},
-    {"label": "Ch. 40 — Rubber and Articles Thereof", "value": "40"},
-    {"label": "Ch. 94 — Furniture & Lighting", "value": "94"},
-    {"label": "Ch. 25 — Salt, Stone, Plaster & Cement", "value": "25"},
-    {"label": "Ch. 48 — Paper and Paperboard", "value": "48"},
-    {"label": "Ch. 62 — Apparel & Clothing Accessories", "value": "62"},
-    {"label": "Ch. 88 — Aircraft, Spacecraft & Parts", "value": "88"},
+    {"label": "87 — Vehicles & Automotive Equipment", "value": "87"},
+    {"label": "84 — Machinery & Mechanical Appliances", "value": "84"},
+    {"label": "85 — Electrical Machinery & Electronics", "value": "85"},
+    {"label": "30 — Pharmaceutical Products", "value": "30"},
+    {"label": "72 — Iron and Steel", "value": "72"},
+    {"label": "73 — Articles of Iron or Steel", "value": "73"},
+    {"label": "27 — Mineral Fuels & Energy", "value": "27"},
+    {"label": "39 — Plastics and Articles Thereof", "value": "39"},
+    {"label": "90 — Optical, Medical & Precision Instruments", "value": "90"},
+    {"label": "04 — Dairy Produce, Honey & Edible Products", "value": "04"},
+    {"label": "22 — Beverages, Spirits and Vinegar", "value": "22"},
+    {"label": "10 — Cereals and Grains", "value": "10"},
+    {"label": "76 — Aluminium and Articles Thereof", "value": "76"},
+    {"label": "40 — Rubber and Articles Thereof", "value": "40"},
+    {"label": "94 — Furniture & Lighting", "value": "94"},
+    {"label": "25 — Salt, Stone, Plaster & Cement", "value": "25"},
+    {"label": "48 — Paper and Paperboard", "value": "48"},
+    {"label": "62 — Apparel & Clothing Accessories", "value": "62"},
+    {"label": "88 — Aircraft, Spacecraft & Parts", "value": "88"},
 ]
 BENCHMARK_PRODUCT_MAP = {opt["value"]: opt["label"] for opt in BENCHMARK_PRODUCT_OPTIONS}
 
 
-def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_year=2025):
+def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_year=None):
     bench_df = load_country_benchmarks()
     if bench_df.empty:
-        return "Growth Trajectory", go.Figure(), "Peer Comparison", go.Figure()
+        return "Growth Trajectory", go.Figure(), "Peer Comparison", go.Figure(), html.Div()
+
+    bench_df = bench_df[(bench_df["year"] >= START_YEAR) & (bench_df["year"] <= END_YEAR)]
 
     product_code = str(product_code or "TOTAL")
     sub_prod = bench_df[bench_df["product_code"] == product_code]
@@ -1746,21 +1964,62 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
     country_colors = {"LU": STATEC_YELLOW, "DE": STATEC_NAVY, "FR": STATEC_BLUE, "BE": "#DC2626", "NL": "#D97706"}
     country_names = {"LU": "Luxembourg", "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands"}
 
+    min_yr = int(sub_prod["year"].min()) if not sub_prod.empty else START_YEAR
+    max_yr = int(sub_prod["year"].max()) if not sub_prod.empty else END_YEAR
+    if selected_year is None:
+        selected_year = max_yr
+    use_year = selected_year if (not sub_prod.empty and selected_year in sub_prod["year"].values) else max_yr
+    n_elapsed = max_yr - min_yr
+
     if flow_metric == "import":
         index_col = "import_index_2000"
         flow_name = "Import Growth"
-        left_title = f"{product_label.upper()} — IMPORT GROWTH TRAJECTORY (BASE 100 = 2000)"
-        right_title = f"{product_label.upper()} — IMPORT VALUE IN {selected_year} (€M)"
+        left_title = f"FIGURE 4.1: {product_label.upper()} — IMPORT GROWTH TRAJECTORY (BASE 100 = {min_yr})"
+        right_title = f"FIGURE 4.2: {product_label.upper()} — IMPORT VALUE IN {use_year} (€M)"
     elif flow_metric == "export":
         index_col = "export_index_2000"
         flow_name = "Export Growth"
-        left_title = f"{product_label.upper()} — EXPORT GROWTH TRAJECTORY (BASE 100 = 2000)"
-        right_title = f"{product_label.upper()} — EXPORT VALUE IN {selected_year} (€M)"
+        left_title = f"FIGURE 4.1: {product_label.upper()} — EXPORT GROWTH TRAJECTORY (BASE 100 = {min_yr})"
+        right_title = f"FIGURE 4.2: {product_label.upper()} — EXPORT VALUE IN {use_year} (€M)"
     else:
         index_col = "volume_index_2000"
         flow_name = "Trade Volume Growth"
-        left_title = f"{product_label.upper()} — TRADE VOLUME GROWTH TRAJECTORY (BASE 100 = 2000)"
-        right_title = f"{product_label.upper()} — TRADE COVERAGE RATIO IN {selected_year} (EXPORTS / IMPORTS %)"
+        left_title = f"FIGURE 4.1: {product_label.upper()} — TRADE VOLUME GROWTH TRAJECTORY (BASE 100 = {min_yr})"
+        right_title = f"FIGURE 4.2: {product_label.upper()} — TRADE COVERAGE RATIO IN {use_year} (EXPORTS / IMPORTS %)"
+
+    # Compute CAGR badges across peer economies
+    cagr_badges = []
+    for c in ["LU", "DE", "FR", "BE", "NL"]:
+        c_sub = sub_prod[sub_prod["reporter_code"] == c].sort_values("year")
+        color = country_colors.get(c, STATEC_GRAY)
+        is_lu = (c == "LU")
+        cagr_str = "N/A"
+        if len(c_sub) >= 2 and index_col in c_sub.columns:
+            v_start = float(c_sub.iloc[0][index_col])
+            v_end = float(c_sub.iloc[-1][index_col])
+            y_start = int(c_sub.iloc[0]["year"])
+            y_end = int(c_sub.iloc[-1]["year"])
+            n = y_end - y_start
+            if n > 0 and v_start > 0 and v_end > 0:
+                cagr = ((v_end / v_start) ** (1.0 / n) - 1.0) * 100.0
+                cagr_str = f"{cagr:+.2f}%/yr"
+
+        badge = html.Span([
+            html.Span(f"{c} ({country_names.get(c, c)}): ", className="fw-semibold"),
+            html.Span(cagr_str, className="fw-bold")
+        ], className="px-2 py-1 rounded small border", style={
+            "backgroundColor": "#FEF9C3" if is_lu else "#F8FAFC",
+            "borderColor": color,
+            "color": "#854D0E" if is_lu else "#1E293B",
+            "borderWidth": "2px" if is_lu else "1px",
+            "fontSize": "0.78rem"
+        })
+        cagr_badges.append(badge)
+
+    badges_container = html.Div([
+        html.Span(f"{n_elapsed}-Year CAGR ({min_yr}–{max_yr}): ", className="small text-muted fw-bold me-1 align-self-center"),
+        *cagr_badges
+    ], className="d-flex flex-wrap align-items-center gap-1 mb-2")
 
     # Left chart: Multi-country trajectory line chart
     fig_index = go.Figure()
@@ -1776,10 +2035,11 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
                 hovertemplate="%{x}: Index %{y:.1f}<extra></extra>"
             ))
 
-    apply_plot_theme(fig_index, y_title=f"{flow_name} Index (2000 = 100)", dtick_x=2, hovermode="x unified")
+    apply_plot_theme(fig_index, y_title=f"{flow_name} Index ({min_yr} = 100)", dtick_x=2, hovermode="x unified")
+    fig_index.update_xaxes(range=[min_yr - 0.2, max_yr + 0.2])
     fig_index.add_hline(
         y=100, line_dash="dash", line_color="#94A3B8", line_width=1,
-        annotation_text="Base 2000 = 100", annotation_position="bottom right",
+        annotation_text=f"Base {min_yr} = 100", annotation_position="bottom right",
         annotation_font=dict(size=9, color="#94A3B8", family="Inter, sans-serif")
     )
     fig_index.update_layout(
@@ -1788,9 +2048,9 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
     )
 
     # Right chart: Peer Comparison for selected_year
-    sub_yr = sub_prod[sub_prod["year"] == selected_year]
-    if sub_yr.empty:
-        sub_yr = sub_prod[sub_prod["year"] == sub_prod["year"].max()]
+    sub_yr = sub_prod[sub_prod["year"] == use_year]
+    if sub_yr.empty and not sub_prod.empty:
+        sub_yr = sub_prod[sub_prod["year"] == max_yr]
 
     sub_yr = sub_yr.copy()
     sub_yr["name"] = sub_yr["reporter_code"].apply(lambda r: country_names.get(r, r))
@@ -1853,16 +2113,25 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
             yaxis=dict(autorange="reversed")
         )
 
-    return left_title, fig_index, right_title, fig_right
+    return left_title, fig_index, right_title, fig_right, badges_container
 
 
 def render_tab_benchmarks(selected_year):
-    left_title, fig_index, right_title, fig_cov = generate_q5_figures("TOTAL", "volume", selected_year)
+    bench_df = load_country_benchmarks()
+    bench_df = bench_df[(bench_df["year"] >= START_YEAR) & (bench_df["year"] <= END_YEAR)]
+    use_year = selected_year if (not bench_df.empty and selected_year in bench_df["year"].values) else (int(bench_df["year"].max()) if not bench_df.empty else END_YEAR)
+    left_title, fig_index, right_title, fig_cov, cagr_badges = generate_q5_figures("TOTAL", "volume", use_year)
 
     return html.Div([
         create_section_header(
-            f"Q5: REGIONAL PEER BENCHMARKING ({selected_year})",
-            "How does Luxembourg's trade compare with neighboring economies (Germany, France, Belgium, Netherlands)? Compare long-term growth trajectories and structural trade balances across key product categories."
+            f"4.1 REGIONAL PEER BENCHMARKING ({use_year})",
+            info_title="Regional Peer Benchmarking Methodology",
+            info_content=[
+                html.P("Compares Luxembourg's foreign trade performance and resilience against neighboring European economies (BE, DE, FR, NL):", className="infobox-intro-text"),
+                create_infobox_item("Base 100", "Normalized Volume Index", "Trade volume is indexed to 100 at the start year, standardizing comparisons across disparate economy sizes.", badge_variant="blue"),
+                create_infobox_item("CAGR", "Compound Annual Growth Rate", "Calculates annualized compound growth over the period to measure long-term trade momentum.", badge_variant="blue"),
+                create_infobox_item("Coverage", "Export-to-Import Coverage Ratio", "Ratio of export revenue to import expenditure (Exports / Imports × 100%), highlighting net trade vulnerability.", badge_variant="blue"),
+            ]
         ),
 
         # Controls Ribbon for Product and Flow Dimension
@@ -1913,6 +2182,7 @@ def render_tab_benchmarks(selected_year):
             dbc.Col([
                 html.Div([
                     html.H6(left_title, id="q5-index-title", className="card-title-upper"),
+                    html.Div(cagr_badges, id="q5-cagr-badges"),
                     dcc.Graph(id="q5-index-graph", figure=fig_index, config={"displayModeBar": False})
                 ], className="dash-card")
             ], md=7),
@@ -1951,6 +2221,7 @@ def update_q5_product_options(basket, current_val):
     Output("q5-index-graph", "figure"),
     Output("q5-cov-title", "children"),
     Output("q5-cov-graph", "figure"),
+    Output("q5-cagr-badges", "children"),
     Input("q5-product-dropdown", "value"),
     Input("q5-flow-radio", "value"),
     Input("global-year-dropdown", "value"),
@@ -1965,16 +2236,28 @@ def update_q5_charts(product_code, flow_metric, selected_year):
 # ───────────────────────────────────────────────────────────────────────────
 def render_tab_seasonality():
     sea_df = load_seasonal_decomposition()
-    options = []
     if not sea_df.empty:
+        sea_df = sea_df[(sea_df["year"] >= START_YEAR) & (sea_df["year"] <= END_YEAR)]
+    options = []
+    min_sea_yr, max_sea_yr = START_YEAR, END_YEAR
+    if not sea_df.empty:
+        min_sea_yr = int(sea_df["year"].min())
+        max_sea_yr = int(sea_df["year"].max())
         u = sea_df[["product_code", "product_name"]].drop_duplicates().sort_values("product_code")
         options = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
     def_p = "TOTAL" if any(o["value"] == "TOTAL" for o in options) else (options[0]["value"] if options else "TOTAL")
 
     return html.Div([
         create_section_header(
-            "Q6: ECONOMETRIC SEASONALITY & TREND",
-            "Do Luxembourg's trade flows exhibit specific seasonal patterns? Decomposes monthly trade into raw observed series, 12-month centered rolling trends, and seasonally adjusted series."
+            "5.1 ECONOMETRIC SEASONALITY & TREND ANALYSIS",
+            info_title="Seasonality Calculation Methodology",
+            info_content=[
+                html.P("Decomposes monthly trade time series into underlying trend, cyclical seasonality, and irregular noise:", className="infobox-intro-text"),
+                create_infobox_item("12M MA", "Trend-Cycle (12M Centered Moving Average)", "A symmetric 12-month centered moving average eliminates intra-year seasonal cycles and irregular month-to-month volatility.", badge_variant="blue"),
+                create_infobox_item("Detrending", "Multiplicative Detrending", "Raw monthly imports and exports are divided by the 12M trend to isolate seasonal ratios (Ratio = Value / Trend).", badge_variant="blue"),
+                create_infobox_item("Robust Median", "Shock-Resistant Seasonal Factors", "For each calendar month, the multi-year median ratio across the observation window is calculated (normalized to 100% mean), resisting economic shocks (e.g. COVID-19, 2022 energy crisis).", badge_variant="blue"),
+                create_infobox_item("SA Series", "Seasonally Adjusted Series", "SA = Value / Factor. For net Trade Balance (which crosses zero), monthly additive deviation vs trend (€M) is used instead of ratios.", badge_variant="blue"),
+            ]
         ),
 
         html.Div([
@@ -2039,14 +2322,14 @@ def render_tab_seasonality():
         dbc.Row([
             dbc.Col([
                 html.Div([
-                    html.H6("MONTHLY TRADE FLOW TIMESERIES & 12M TREND (€M)", className="card-title-upper"),
+                    html.H6(f"FIGURE 5.1: MONTHLY TRADE FLOW TIMESERIES & 12M TREND ({min_sea_yr}–{max_sea_yr}) (€M)", className="card-title-upper"),
                     dcc.Graph(id="sea-timeseries-chart", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=8),
 
             dbc.Col([
                 html.Div([
-                    html.H6("MONTHLY SEASONAL FACTORS & DEVIATION", className="card-title-upper"),
+                    html.H6("FIGURE 5.2: MONTHLY SEASONAL FACTORS & DEVIATION", className="card-title-upper"),
                     dcc.Graph(id="sea-factors-chart", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=4)
@@ -2065,6 +2348,7 @@ def update_sea_product_options(basket, current_val):
     if sea_df.empty:
         return [], "TOTAL"
 
+    sea_df = sea_df[(sea_df["year"] >= START_YEAR) & (sea_df["year"] <= END_YEAR)]
     u = sea_df[["product_code", "product_name"]].drop_duplicates().sort_values("product_code")
     all_opts = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
 
@@ -2091,6 +2375,9 @@ def update_sea_product_options(basket, current_val):
 )
 def update_seasonality_charts(product, flow, selected_series):
     sea_df = load_seasonal_decomposition()
+    if not sea_df.empty:
+        sea_df = sea_df[(sea_df["year"] >= START_YEAR) & (sea_df["year"] <= END_YEAR)]
+
     if flow == "BALANCE":
         imp = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == "IMPORT")].sort_values("date").copy()
         exp = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == "EXPORT")].sort_values("date").copy()
@@ -2108,6 +2395,7 @@ def update_seasonality_charts(product, flow, selected_series):
         if sub.empty:
             return go.Figure(), go.Figure()
 
+    selected_series = selected_series or []
     fig_ts = go.Figure()
     flow_lbl = "Trade Balance" if flow == "BALANCE" else flow.capitalize()
     if "raw" in selected_series:
@@ -2132,6 +2420,24 @@ def update_seasonality_charts(product, flow, selected_series):
             hovertemplate="%{x}: SA €%{y:,.1f}M<extra></extra>"
         ))
     apply_plot_theme(fig_ts, y_title="Million Euros (€M)", hovermode="x unified")
+    min_sub_date = str(sub["date"].min())[:10] if not sub.empty else f"{START_YEAR}-01-01"
+    max_sub_date = str(sub["date"].max())[:10] if not sub.empty else f"{END_YEAR}-12-31"
+    fig_ts.update_xaxes(
+        range=[min_sub_date, max_sub_date],
+        rangeselector=dict(
+            buttons=list([
+                dict(count=2, label="2Y", step="year", stepmode="backward"),
+                dict(count=5, label="5Y", step="year", stepmode="backward"),
+                dict(count=10, label="10Y", step="year", stepmode="backward"),
+                dict(step="all", label="All")
+            ]),
+            bgcolor="#F1F5F9",
+            activecolor="#CBD5E1",
+            font=dict(size=10, family="Inter, sans-serif")
+        ),
+        rangeslider=dict(visible=True, thickness=0.08),
+        type="date"
+    )
     fig_ts.update_layout(
         margin=dict(l=10, r=20, t=25, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
@@ -2143,7 +2449,8 @@ def update_seasonality_charts(product, flow, selected_series):
         factors = sub.groupby("month")["seasonal_dev_eur"].mean().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
         dev_m = factors["seasonal_dev_eur"] / 1e6
-        colors = [SUCCESS if v > 15 else (DANGER if v < -15 else STATEC_BLUE) for v in dev_m]
+        thresh_m = max(5.0, round(float(dev_m.abs().quantile(0.75)), 1))
+        colors = [SUCCESS if v > thresh_m else (DANGER if v < -thresh_m else STATEC_BLUE) for v in dev_m]
         fig_factors = go.Figure(go.Bar(
             x=factors["month_name"],
             y=dev_m,
@@ -2154,31 +2461,79 @@ def update_seasonality_charts(product, flow, selected_series):
             hovertemplate="%{x}: Deviation %{text}<extra></extra>"
         ))
         apply_plot_theme(fig_factors, y_title="Deviation vs Trend (€M)")
-        fig_factors.add_trace(go.Bar(name="Deficit Narrowing (> +€15M)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
+        fig_factors.add_trace(go.Bar(name=f"Deficit Narrowing (> +€{thresh_m:.1f}M)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
-        fig_factors.add_trace(go.Bar(name="Deficit Widening (< -€15M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+        fig_factors.add_trace(go.Bar(name=f"Deficit Widening (< -€{thresh_m:.1f}M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
         y_vals = dev_m
+
+        aug_row = factors[factors["month"] == 8]
+        if not aug_row.empty:
+            aug_val = float(aug_row.iloc[0]["seasonal_dev_eur"] / 1e6)
+            aug_title = "August Slump" if aug_val < 0 else "August Activity"
+            fig_factors.add_annotation(
+                x="Aug", y=aug_val,
+                text=f"<b>{aug_title} ({aug_val:+.1f}M)</b><br>Congé effect",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
+                arrowcolor=SUCCESS if aug_val > 0 else DANGER,
+                ax=0, ay=-35 if aug_val > 0 else 35,
+                bgcolor="#F8FAFC", bordercolor="#94A3B8", borderwidth=1, borderpad=3,
+                font=dict(size=9, color="#1E293B", family="Inter, sans-serif")
+            )
     else:
         factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
-        colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else STATEC_BLUE) for m, f in zip(factors["month"], factors["seasonal_factor"])]
+        dev_pct = (factors["seasonal_factor"] - 1.0) * 100
+        thresh_pct = max(3.0, round(float(dev_pct.abs().quantile(0.75)), 1))
+        colors = [DANGER if m == 8 else (SUCCESS if dev > thresh_pct else STATEC_BLUE) for m, dev in zip(factors["month"], dev_pct)]
         fig_factors = go.Figure(go.Bar(
             x=factors["month_name"],
-            y=(factors["seasonal_factor"] - 1.0) * 100,
+            y=dev_pct,
             showlegend=False,
             marker_color=colors,
-            text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
+            text=dev_pct.apply(lambda p: f"{p:+.1f}%"),
             textposition="outside",
             hovertemplate="%{x}: %{text}<extra></extra>"
         ))
         apply_plot_theme(fig_factors, y_title="% vs Annual Trend")
-        fig_factors.add_trace(go.Bar(name="Peak Month (> +5%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
+        fig_factors.add_trace(go.Bar(name=f"Peak Month (> +{thresh_pct:.1f}%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
         fig_factors.add_trace(go.Bar(name="August Slump", x=[None], y=[None], marker_color=DANGER, showlegend=True))
-        y_vals = (factors["seasonal_factor"] - 1.0) * 100
+        y_vals = dev_pct
+
+        aug_row = factors[factors["month"] == 8]
+        if not aug_row.empty:
+            aug_val = float((aug_row.iloc[0]["seasonal_factor"] - 1.0) * 100)
+            aug_title = "August Slump" if aug_val < 0 else "August Peak"
+            fig_factors.add_annotation(
+                x="Aug", y=aug_val,
+                text=f"<b>{aug_title} ({aug_val:+.1f}%)</b><br>Congé Collectif",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
+                arrowcolor=DANGER if aug_val < 0 else SUCCESS,
+                ax=0, ay=38 if aug_val < 0 else -38,
+                bgcolor="#FEF2F2" if aug_val < 0 else "#F0FDF4",
+                bordercolor=DANGER if aug_val < 0 else SUCCESS,
+                borderwidth=1, borderpad=3,
+                font=dict(size=9, color="#991B1B" if aug_val < 0 else "#166534", family="Inter, sans-serif")
+            )
+
+        max_idx = dev_pct.idxmax()
+        peak_row = factors.loc[max_idx]
+        if peak_row["month"] != 8:
+            peak_val = float(dev_pct.loc[max_idx])
+            peak_m_name = peak_row["month_name"]
+            season_tag = "Spring Peak" if peak_row["month"] in [3, 4, 5] else ("Autumn Peak" if peak_row["month"] in [9, 10, 11] else ("Winter Peak" if peak_row["month"] in [12, 1, 2] else "Summer Peak"))
+            fig_factors.add_annotation(
+                x=peak_m_name, y=peak_val,
+                text=f"<b>{season_tag} ({peak_val:+.1f}%)</b><br>{peak_m_name} Activity",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
+                arrowcolor=SUCCESS,
+                ax=0, ay=-38 if peak_val > 0 else 38,
+                bgcolor="#F0FDF4", bordercolor=SUCCESS, borderwidth=1, borderpad=3,
+                font=dict(size=9, color="#166534", family="Inter, sans-serif")
+            )
 
     y_min, y_max = float(y_vals.min()), float(y_vals.max())
-    y_pad = max(abs(y_min), abs(y_max), 5.0) * 0.25
+    y_pad = max(abs(y_min), abs(y_max), 5.0) * 0.45
     fig_factors.update_yaxes(range=[y_min - y_pad, y_max + y_pad])
     fig_factors.update_layout(
         showlegend=True,

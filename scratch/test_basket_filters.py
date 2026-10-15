@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from src.dashboard.app import (
     update_q4_chart,
     update_q2_charts,
@@ -38,6 +45,26 @@ def test_all():
     print("Testing Q6 seasonality options with basket METALS...")
     sea_opts, sea_val = update_sea_product_options("METALS", "72")
     print("  Q6 METALS options:", [o['value'] for o in sea_opts], "selected:", sea_val)
+
+    print("Testing Q4 with basket NON_CRITICAL...")
+    title, fig = update_q4_chart("DE", "IMPORT", 4, 15, "NON_CRITICAL", 2025)
+    print("  Q4 NON_CRITICAL title:", title, "Data traces:", len(fig.data))
+
+    print("Testing Q2 with basket NON_CRITICAL...")
+    t1, fig_bar, fig_shift, t2 = update_q2_charts("IMPORT", 2, "NON_CRITICAL", "39", 2025)
+    print("  Q2 NON_CRITICAL titles:", t1, " | ", t2, "traces:", len(fig_bar.data), len(fig_shift.data))
+
+    print("Testing Q3 product options with basket NON_CRITICAL...")
+    opts = update_q3_product_options("NON_CRITICAL")
+    print("  Q3 NON_CRITICAL options count:", len(opts))
+
+    print("Testing Q5 product options with basket NON_CRITICAL...")
+    q5_opts, q5_val = update_q5_product_options("NON_CRITICAL", "39")
+    print("  Q5 NON_CRITICAL options:", [o['value'] for o in q5_opts], "selected:", q5_val)
+
+    print("Testing Q6 seasonality options with basket NON_CRITICAL...")
+    sea_opts, sea_val = update_sea_product_options("NON_CRITICAL", "39")
+    print("  Q6 NON_CRITICAL options:", [o['value'] for o in sea_opts], "selected:", sea_val)
 
     print("\nALL BASKET FILTER TESTS PASSED SUCCESSFULLY!")
 

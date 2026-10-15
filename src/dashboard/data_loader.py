@@ -61,6 +61,10 @@ def load_hs4_product_rankings() -> pd.DataFrame:
     return _load_csv_cached("hs4_product_rankings.csv", dtype={"hs4_code": str, "hs2_parent": str})
 
 
+def load_hs8_product_rankings() -> pd.DataFrame:
+    return _load_csv_cached("hs8_product_rankings.csv", dtype={"hs8_code": str, "hs2_parent": str, "hs4_parent": str})
+
+
 def load_product_partners() -> pd.DataFrame:
     return _load_csv_cached("product_partners.csv", dtype={"hs2_code": str, "partner_code": str})
 

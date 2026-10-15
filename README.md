@@ -69,33 +69,32 @@ python run_pipeline.py --help
 
 ---
 
-## Dual-Audience Dashboard Architecture
+## Dashboard Architecture & Navigation
 
-The dashboard is structured into two distinct operational modes to serve two target audiences:
+The dashboard is structured into 5 high-impact analytical views covering the full scope of Luxembourg's external trade intelligence and sovereign supply security:
 
-### 1. 🏛️ National Leadership Briefing (Answers Pressing Questions First)
-Designed for national leaders, ministers, policy makers, and directors who require an immediate, high-impact assessment of Luxembourg's sovereign supply chain resilience and economic security:
-* **Sovereign Supply Chain & Resilience Radar (Default on Load)**:
-  * **Executive Alert Tiles**: Instant visibility into single-point energy vulnerabilities, port corridor transit risks, the macro service buffer, and seasonal supply dips.
-  * **Strategic Basket Vulnerability Chart**: Compares 6 vital import baskets (Energy, Food, Health, Tech, Raw Materials, Vehicles) on Supplier Concentration Index (HHI), Top Supplier Dominance (%), and Hub Transit Dependency (%).
-  * **Stress-Test Basket Cards**: Individual risk cards with HHI badges (High / Moderate / Diversified), leading 4-digit good vulnerabilities, and single-click links to granular analyst data.
-  * **Sovereign Policy Recommendations**: Concrete safeguards regarding petroleum stockpiles, port agreements with Antwerp/Rotterdam, and hospital medicine reserves.
-* **Macroeconomic Health & Sovereignty**:
-  * 25-year trade volume trajectory (+89% growth).
-  * Plain-language explanation of the structural merchandise trade deficit (-€9.2B) and why a ~65% goods coverage ratio is sustainably balanced by Luxembourg's €25B+ services surplus.
-  * Intra-EU integration (>80%) single-market cushion.
-* **Geopolitical Exposure & Seasonal Shocks**:
-  * Direct neighbor import dependency (Belgium 32.9%, Germany 28.2%, France 12.5% = 73.6% of physical imports).
-  * Third-country geopolitical exposure (United States, China, United Kingdom).
-  * Operational warning regarding the annual **August -14.4% trade contraction** during collective industrial leave ("congé collectif").
+### 1. 🛡️ Resilience Radar (National Resilience Strategy, Pillars 3–5)
+Designed for national leaders, policymakers, and directors assessing sovereign supply chain resilience and strategic autonomy:
+* **Critical Import Baskets & Concentration**: Compares 6 vital merchandise baskets (*Energy, Food, Health, Metals, Tech, Vehicles*) on Herfindahl-Hirschman Index (HHI), Top Supplier Dominance (%), and Port Corridor Transit Reliance (via Antwerp/Rotterdam hubs).
+* **Strategic Basket Stress Cards**: Risk cards with dynamic HHI badges (Low / Moderate / High), leading 4-digit good vulnerabilities, and supplier breakdown.
+* **Macroeconomic Trajectory & Trade Balance**: Multi-decade merchandise volume trajectory, structural goods deficit contextualized by Luxembourg's massive services surplus, and EU Single Market integration (>80%).
+* **Geopolitical Origins & Non-EU Exposure**: Direct neighbor dependency breakdown (Belgium, Germany, France = >73% of physical imports) and top strategic third-country suppliers (US, China, UK, Japan).
 
-### 2. 🔬 Data Analyst Deep-Dive Suite (Explore Details Afterwards)
-Designed for economists, trade researchers, and data analysts requiring granular micro-data exploration tools:
-* **Tab 1: Trading Partners & Global Map (Q1)**: Interactive choropleth map linked to ISO-3 country codes with regional scope zoom (🇪🇺 Europe, 🌍 World, 🌎 Americas, 🌏 Asia), metric toggle (Trade Value vs Market Share), interactive click-to-spotlight synchronization with Top 10 partner bar charts, and 25-year historical share evolution.
-* **Tab 2: Product Categories & Structural Shift (Q2)**: Multi-level treemaps (HS Section $\rightarrow$ HS2 Chapter $\rightarrow$ HS4 Subheading) and 25-year structural transformation charts from steel to advanced machinery and automotive.
-* **Tab 3: Hierarchical Micro-Flows HS2 $\rightarrow$ HS4 $\rightarrow$ CN8 (Q3 & Q4)**: Product partner choropleth map and concentration analysis (Q3) with interactive supplier click-spotlight, and partner-specific tariff line drilldowns up to 8-digit CN8 codes with dynamic significance threshold filtering (Q4).
-* **Tab 4: Econometric Seasonality & Trend Lab (Q6)**: Decomposition into raw observed series, 12-month centered rolling trend, and seasonally adjusted series with empirical month-of-year seasonal factors.
-* **Tab 5: Regional Peer Benchmarking (Q5)**: Comparative volume expansion index (2000 = 100) and merchandise coverage ratio benchmarks against Germany, France, Belgium, and the Netherlands.
+### 2. 🌍 Trading Partners (Q1 & Q4) — Bilateral Flows & Tariff Drill-Down
+* **Q1 Main Trading Partners**: Interactive choropleth map with European and Global scope zoom, Top 10 trading partners bar chart with Value (€) vs Market Share (%) metric toggle, and interactive click-to-spotlight inspection.
+* **Q4 Detailed Tariff Line Drill-Down**: Deep hierarchical drill-down for any partner country across **2-digit (HS2 Chapters)**, **4-digit (HS4 Subheadings)**, and **8-digit (CN8 Tariff Lines)** with dynamic significance threshold filtering (Top 15, Top 25, or value cutoffs) and **Critical Basket Filters**.
+
+### 3. 📦 Product Categories (Q2 & Q3) — Structural Shifts & Principal Origins
+* **Q2 Product Categories & Structural Shift**: HS2 Chapter and HS4 Subheading rankings alongside multi-decade structural transformation charts capturing Luxembourg's historical shift from steel dominance to automotive equipment, advanced machinery, plastics, and pharmaceuticals.
+* **Q3 Principal Partners by Product Category**: Geographical sourcing map and supplier distribution ranking for any HS chapter, highlighting concentration and source nations with **Critical Basket Filters**.
+
+### 4. 📊 Peer Benchmarks (Q5) — Regional Economic Comparison
+* **Comparative Expansion Trajectory**: Multi-country volume, export, and import growth trajectories indexed to **Base 100 = 2000**, benchmarking Luxembourg against Germany, France, Belgium, and the Netherlands across all goods or specific sectors.
+* **Structural Coverage Ratio Benchmarks**: Bilateral export-to-import coverage ratios with explicit 100% parity threshold markers.
+
+### 5. 📅 Seasonality (Q6) — Econometric Seasonality & Trend Lab
+* **Three-Series Time Series Decomposition**: Toggle between raw observed monthly flows, 12-month centered rolling trend, and seasonally adjusted series for imports, exports, and net trade balance.
+* **Monthly Seasonal Factors**: Bar decomposition isolating recurring seasonal deviations, spotlighting the annual **August industrial slump (-14.4%)** during collective summer leave (*congé collectif*) and spring/autumn rebound peaks.
 
 ---
 

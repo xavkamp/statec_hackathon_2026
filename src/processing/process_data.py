@@ -411,6 +411,55 @@ def process_hs4_products() -> pd.DataFrame:
     return res
 
 
+def process_hs8_products() -> pd.DataFrame:
+    """Compute 8-digit CN tariff line rankings and parent chapter contributions."""
+    raw_path = RAW_DIR / "hs8_products_annual_raw.csv"
+    if not raw_path.exists():
+        logger.warning(f"{raw_path.name} not found, skipping HS8 processing.")
+        return pd.DataFrame()
+
+    logger.info(f"Processing 8-digit CN tariff lines from {raw_path.name}")
+    df = pd.read_csv(raw_path)
+
+    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
+    df["flow"] = df["flow_label"].str.upper()
+    df["hs8_code"] = df["product"].astype(str).str.zfill(8)
+    df["hs8_name"] = df["product_label"]
+    df["hs2_parent"] = df["hs8_code"].str[:2]
+    df["hs4_parent"] = df["hs8_code"].str[:4]
+    df["hs_section"] = df["hs2_parent"].apply(get_hs_section)
+    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
+
+    # Filter positive trade values
+    df = df[df["value_eur"] > 0].copy()
+
+    # Total trade per year and flow
+    totals = df.groupby(["year", "flow"])["value_eur"].transform("sum")
+    df["total_eur"] = totals
+    df["product_share_pct"] = np.where(df["total_eur"] > 0, (df["value_eur"] / df["total_eur"]) * 100, 0.0)
+
+    # Contribution within parent 2-digit chapter
+    ch_totals = df.groupby(["year", "flow", "hs2_parent"])["value_eur"].transform("sum")
+    df["share_in_chapter_pct"] = np.where(ch_totals > 0, (df["value_eur"] / ch_totals) * 100, 0.0)
+
+    # Overall rank and rank within chapter
+    df = df.sort_values(by=["year", "flow", "value_eur"], ascending=[True, True, False])
+    df["overall_rank"] = df.groupby(["year", "flow"]).cumcount() + 1
+    df["rank_in_chapter"] = df.groupby(["year", "flow", "hs2_parent"]).cumcount() + 1
+
+    cols = [
+        "year", "flow", "hs8_code", "hs8_name", "hs2_parent", "hs4_parent", "hs_section",
+        "value_eur", "total_eur", "product_share_pct", "share_in_chapter_pct",
+        "overall_rank", "rank_in_chapter"
+    ]
+    res = df[cols].copy()
+
+    out_file = PROCESSED_DIR / "hs8_product_rankings.csv"
+    res.to_csv(out_file, index=False, encoding="utf-8")
+    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
+    return res
+
+
 def run_all_processing():
     """Run full processing pipeline generating processed CSV files."""
     logger.info("=== Starting Processing Pipeline (Raw CSV -> Processed CSV) ===")
@@ -423,6 +472,7 @@ def run_all_processing():
     process_partner_drilldown()
     process_product_partners()
     process_hs4_products()
+    process_hs8_products()
     logger.info("=== Tabular CSV Processing Completed Successfully ===")
 
 

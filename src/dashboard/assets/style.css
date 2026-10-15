@@ -518,28 +518,31 @@ table.table tbody tr:last-child td {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background-color: #EDF2F7;
-    color: var(--statec-navy);
-    font-size: 12px;
+    background-color: #EFF6FF;
+    color: var(--statec-blue);
+    font-size: 13px;
     font-weight: 800;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    border: 1.5px solid #CBD5E1;
+    border: 1.5px solid #BFDBFE;
     margin-left: 8px;
     line-height: 1;
     user-select: none;
+    outline: none;
 }
 
 .info-hover-wrapper:hover .info-hover-icon,
-.info-hover-icon:hover {
+.info-hover-wrapper:focus-within .info-hover-icon,
+.info-hover-icon:hover,
+.info-hover-icon:focus {
     background-color: var(--statec-yellow) !important;
     color: var(--statec-navy) !important;
     border-color: #D9A700 !important;
-    transform: scale(1.15);
-    box-shadow: 0 2px 8px rgba(255, 200, 0, 0.45);
+    transform: scale(1.12);
+    box-shadow: 0 3px 10px rgba(255, 200, 0, 0.45);
 }
 
 .info-hover-card {
@@ -548,14 +551,14 @@ table.table tbody tr:last-child td {
     position: absolute;
     top: calc(100% + 8px);
     left: 0;
-    width: 450px;
-    max-width: 88vw;
+    width: 480px;
+    max-width: 90vw;
     background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-left: 4px solid var(--statec-yellow);
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid var(--statec-blue);
     border-radius: 8px;
-    box-shadow: 0 14px 32px rgba(0, 26, 56, 0.22), 0 4px 12px rgba(0, 26, 56, 0.1);
-    padding: 14px 16px;
+    box-shadow: 0 16px 36px rgba(0, 26, 56, 0.18), 0 4px 12px rgba(0, 26, 56, 0.08);
+    padding: 16px 18px;
     z-index: 999999;
     transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
     transform: translateY(6px);
@@ -570,6 +573,7 @@ table.table tbody tr:last-child td {
 }
 
 .info-hover-wrapper:hover .info-hover-card,
+.info-hover-wrapper:focus-within .info-hover-card,
 .info-hover-card:hover {
     visibility: visible;
     opacity: 1;
@@ -595,6 +599,115 @@ table.table tbody tr:last-child td {
     right: 18px;
 }
 
+/* Card Header & Title */
+.infobox-card-header {
+    display: flex;
+    align-items: center;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.infobox-header-icon {
+    color: var(--statec-blue);
+    font-size: 14px;
+}
+
+.infobox-card-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--statec-navy);
+    line-height: 1.2;
+}
+
+/* Card Body & Structured Items */
+.infobox-card-body {
+    padding-left: 2px;
+}
+
+.infobox-intro-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #1E293B;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+.infobox-item-row {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #F1F5F9;
+}
+
+.infobox-item-row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.infobox-item-term {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+.infobox-item-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.45;
+}
+
+/* Badges for Infobox Items */
+.infobox-pill-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    margin-right: 7px;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.infobox-badge-blue {
+    background-color: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+}
+
+.infobox-badge-green,
+.infobox-badge-success {
+    background-color: #DCFCE7;
+    color: #15803D;
+    border: 1px solid #86EFAC;
+}
+
+.infobox-badge-yellow,
+.infobox-badge-warning {
+    background-color: #FEF9C3;
+    color: #A16207;
+    border: 1px solid #FDE047;
+}
+
+.infobox-badge-red,
+.infobox-badge-danger {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+}
+
+.infobox-badge-neutral {
+    background-color: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+}
+
 .info-hover-text {
     text-decoration: underline dotted var(--statec-blue) 1.5px;
     text-underline-offset: 3px;
@@ -608,6 +721,33 @@ table.table tbody tr:last-child td {
 
 .info-hover-text:hover {
     color: var(--statec-blue);
+}
+
+.section-info-pill {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--statec-navy);
+    background: #EFF6FF;
+    padding: 3px 10px;
+    border-radius: 14px;
+    border: 1px solid #BFDBFE;
+    margin-left: 10px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    text-decoration: none !important;
+    user-select: none;
+    outline: none;
+}
+
+.section-info-pill:hover,
+.section-info-pill:focus {
+    background: #DBEAFE;
+    border-color: #93C5FD;
+    color: var(--statec-blue);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 94, 184, 0.18);
 }
 
 /* --------------------------------------------------------------------------

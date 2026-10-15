@@ -170,19 +170,38 @@ KPI_CARD_STYLE = {}
 STATEC_HEADING_STYLE = {}
 
 
-def apply_map_theme(fig, scope="europe"):
-    """Applies modern, high-contrast, institutional styling to Plotly Choropleth/Scattergeo maps."""
-    fig.update_geos(
+LUXEMBOURG_GEO = {
+    "lat": 49.8153,
+    "lon": 6.1296
+}
+
+
+def apply_map_theme(fig, scope="europe", center=None):
+    """Applies modern, high-contrast, institutional styling to Plotly Choropleth/Scattergeo maps,
+    centered on Luxembourg (49.8153° N, 6.1296° E) by default.
+    """
+    scope = scope if scope else "europe"
+    target_center = center if center is not None else LUXEMBOURG_GEO
+
+    geo_config = dict(
         showcoastlines=True, coastlinecolor="#CBD5E1",
         showland=True, landcolor="#EDF2F7",
         showocean=True, oceancolor="#F8FAFC",
         showcountries=True, countrycolor="#CBD5E1",
         showlakes=True, lakecolor="#F8FAFC",
-        scope=scope if scope else "europe",
-        projection_type="natural earth" if scope == "world" else "mercator",
+        scope=scope,
         bgcolor="rgba(0,0,0,0)",
         framewidth=0
     )
+
+    if scope == "world":
+        geo_config["projection_type"] = "natural earth"
+        geo_config["projection_rotation"] = dict(lon=target_center.get("lon", LUXEMBOURG_GEO["lon"]))
+    else:
+        geo_config["projection_type"] = "mercator"
+        geo_config["center"] = target_center
+
+    fig.update_geos(**geo_config)
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -219,48 +238,265 @@ def create_icon_badge(icon_class: str, variant: str = None, color: str = None, b
     )
 
 
-INFO_HOVER_CSS = ""
+INFO_HOVER_CSS = """
+.info-hover-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.info-hover-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background-color: #EFF6FF !important;
+    color: #005EB8 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    border: 1.5px solid #BFDBFE !important;
+    margin-left: 8px !important;
+    line-height: 1 !important;
+    user-select: none !important;
+    outline: none !important;
+}
+
+.info-hover-wrapper:hover .info-hover-icon,
+.info-hover-wrapper:focus-within .info-hover-icon,
+.info-hover-icon:hover,
+.info-hover-icon:focus {
+    background-color: #FFC800 !important;
+    color: #001A38 !important;
+    border-color: #D9A700 !important;
+    transform: scale(1.12) !important;
+    box-shadow: 0 3px 10px rgba(255, 200, 0, 0.45) !important;
+}
+
+.info-hover-card {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 480px !important;
+    max-width: 90vw !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-left: 4px solid #005EB8 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 16px 36px rgba(0, 26, 56, 0.18), 0 4px 12px rgba(0, 26, 56, 0.08) !important;
+    padding: 16px 18px !important;
+    z-index: 999999 !important;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s !important;
+    transform: translateY(6px);
+    pointer-events: none;
+    text-align: left;
+    white-space: normal;
+}
+
+.info-hover-align-right .info-hover-card {
+    left: auto;
+    right: 0;
+}
+
+.info-hover-wrapper:hover .info-hover-card,
+.info-hover-wrapper:focus-within .info-hover-card,
+.info-hover-card:hover {
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+}
+
+.info-hover-card::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 18px;
+    width: 10px;
+    height: 10px;
+    background: #FFFFFF;
+    border-left: 1px solid #CBD5E1;
+    border-top: 1px solid #CBD5E1;
+    transform: rotate(45deg);
+}
+
+.info-hover-align-right .info-hover-card::before {
+    left: auto;
+    right: 18px;
+}
+
+.infobox-card-header {
+    display: flex !important;
+    align-items: center !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 10px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+}
+
+.infobox-header-icon {
+    color: #005EB8 !important;
+    font-size: 14px !important;
+    margin-right: 8px !important;
+}
+
+.infobox-card-title {
+    font-family: 'Montserrat', sans-serif !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    color: #001A38 !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0 !important;
+}
+
+.infobox-card-body {
+    padding-left: 2px !important;
+}
+
+.infobox-intro-text {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #1E293B !important;
+    line-height: 1.5 !important;
+    margin-bottom: 10px !important;
+}
+
+.infobox-item-row {
+    margin-bottom: 8px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px dashed #F1F5F9 !important;
+}
+
+.infobox-item-row:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+}
+
+.infobox-item-term {
+    font-family: 'Montserrat', sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+}
+
+.infobox-item-desc {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 11.5px !important;
+    font-weight: 400 !important;
+    color: #475569 !important;
+    line-height: 1.45 !important;
+    margin-top: 2px !important;
+}
+
+.infobox-pill-badge {
+    display: inline-block !important;
+    padding: 2px 7px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    border-radius: 4px !important;
+    margin-right: 8px !important;
+    letter-spacing: 0.02em !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+.infobox-badge-blue {
+    background-color: #EFF6FF !important;
+    color: #1D4ED8 !important;
+    border: 1px solid #BFDBFE !important;
+}
+
+.infobox-badge-green,
+.infobox-badge-success {
+    background-color: #DCFCE7 !important;
+    color: #15803D !important;
+    border: 1px solid #86EFAC !important;
+}
+
+.infobox-badge-yellow,
+.infobox-badge-warning {
+    background-color: #FEF9C3 !important;
+    color: #A16207 !important;
+    border: 1px solid #FDE047 !important;
+}
+
+.infobox-badge-red,
+.infobox-badge-danger {
+    background-color: #FEE2E2 !important;
+    color: #B91C1C !important;
+    border: 1px solid #FCA5A5 !important;
+}
+
+.infobox-badge-neutral {
+    background-color: #F1F5F9 !important;
+    color: #334155 !important;
+    border: 1px solid #CBD5E1 !important;
+}
+"""
+
+
+def create_infobox_item(badge_text: str, title: str, description: str, badge_variant: str = "blue") -> html.Div:
+    """
+    Renders a unified, structured infobox row with a styled badge, bold title, and description.
+    """
+    badge_cls = f"infobox-badge-{badge_variant}"
+    return html.Div([
+        html.Div([
+            html.Span(badge_text, className=f"infobox-pill-badge {badge_cls}"),
+            html.Span(title, className="infobox-item-term")
+        ], className="d-flex align-items-center mb-1"),
+        html.Div(description, className="infobox-item-desc ps-1")
+    ], className="infobox-item-row")
 
 
 def create_info_hover(
     title: str,
     text_or_elements,
-    icon: str = "ⓘ",
-    variant: str = "gold",
+    icon: str = None,
+    variant: str = "primary",
     label_text: str = None,
     align: str = "left",
-    className: str = ""
+    className: str = "",
+    card_className: str = ""
 ):
     """
-    Renders an interactive hover element (info icon or text passage) that reveals
-    a floating, formatted infobox tooltip when hovered.
+    Renders an interactive hover element that reveals
+    a floating, harmonized infobox tooltip when hovered.
     """
     content = text_or_elements if isinstance(text_or_elements, (list, tuple)) else [
-        html.P(text_or_elements, className="text-muted-custom mb-0 small")
+        html.P(text_or_elements, className="infobox-intro-text mb-0")
     ]
 
     card = html.Div([
         html.Div([
-            html.I(className="bi bi-info-circle-fill me-2 small"),
-            html.Span(title.upper(), className="kpi-label mb-0"),
-        ], className="d-flex align-items-center mb-1"),
-        html.Div(content, className="ps-3")
-    ], className=f"info-hover-card variant-{variant}")
+            html.I(className="bi bi-info-circle-fill infobox-header-icon me-2"),
+            html.Span(title.upper(), className="infobox-card-title"),
+        ], className="infobox-card-header"),
+        html.Div(content, className="infobox-card-body")
+    ], className=f"info-hover-card {card_className}".strip())
 
-    icon_node = html.I(className="bi bi-info-lg fw-bold") if (icon == "ⓘ" or not icon) else (
-        html.I(className=icon) if (isinstance(icon, str) and icon.startswith("bi ")) else icon
-    )
+    icon_node = html.I(className="bi bi-info-lg fw-bold")
 
     if label_text:
         trigger = html.Span([
             html.Span(label_text, className="me-1"),
-            html.Span(icon_node, className=f"info-hover-icon info-icon-{variant}")
-        ], className="info-hover-text")
+            html.Span(icon_node, className="info-hover-icon")
+        ], className="section-info-pill", tabIndex=0)
     else:
         trigger = html.Span(
             icon_node,
-            className=f"info-hover-icon info-icon-{variant}",
-            title="Hover to view explanation"
+            className="info-hover-icon",
+            title="Hover or focus to view explanation",
+            tabIndex=0
         )
 
     align_class = "info-hover-align-right" if align == "right" else ""
@@ -274,9 +510,11 @@ def create_section_header(
     badge_color: str = None,
     info_title: str = None,
     info_content = None,
-    info_icon: str = "ⓘ",
-    info_variant: str = "gold",
-    info_align: str = "left"
+    info_icon: str = None,
+    info_variant: str = "primary",
+    info_align: str = "left",
+    info_label: str = None,
+    info_card_class: str = ""
 ):
     """
     Generates a portal section heading with Montserrat bold typography, gold accent mark,
@@ -297,7 +535,9 @@ def create_section_header(
             text_or_elements=info_content,
             icon=info_icon,
             variant=info_variant,
-            align=info_align
+            align=info_align,
+            label_text=info_label,
+            card_className=info_card_class
         )
 
     title_row = html.Div([
@@ -371,6 +611,11 @@ def get_concentration_badge(hhi: float):
 
 def create_dashboard_footer():
     """Institutional footer with English disclaimer for Hackathon 2026."""
+    try:
+        from src.config import START_YEAR, END_YEAR
+    except Exception:
+        START_YEAR, END_YEAR = 2000, 2025
+
     return html.Footer([
         html.Div([
             html.Div([
@@ -379,7 +624,7 @@ def create_dashboard_footer():
             ], className="mb-3 mb-md-0"),
 
             html.Div([
-                html.Span("Data sources: Eurostat Comext [ds-045409] & STATEC Open Data (2000–2026)", className="footer-source-text"),
+                html.Span(f"Data sources: Eurostat Comext [ds-045409] & STATEC Open Data ({START_YEAR}–{END_YEAR})", className="footer-source-text"),
                 html.Span("Analytical Research Project • Hackathon 2026 (Unofficial Prototype)", className="footer-proto-text"),
             ], className="text-md-end text-start"),
         ], className="d-flex flex-column flex-md-row justify-content-between align-items-md-center py-4 footer-inner"),

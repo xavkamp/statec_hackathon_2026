@@ -15,9 +15,9 @@ PROCESSED_DIR = DATA_DIR / "processed"
 # Eurostat Comext API
 COMEXT_API_URL = "https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/ds-045409"
 
-# Time span constraint: 2000 - 2026
+# Time span constraint: 2000 - 2025
 START_YEAR = 2000
-END_YEAR = 2026
+END_YEAR = 2025
 YEARS = [str(y) for y in range(START_YEAR, END_YEAR + 1)]
 
 # Reporters

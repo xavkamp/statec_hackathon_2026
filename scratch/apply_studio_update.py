@@ -779,25 +779,7 @@ def update_studio_product_perspective(product_code, flow, year, scope):
 '''
 
 def main():
-    app_path = Path("src/dashboard/app.py")
-    lines = app_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    
-    start_idx = None
-    end_idx = None
-    
-    for i, line in enumerate(lines):
-        if "TAB 1 (ANALYST): STUDIO GÉO-TARIFAIRE & DRILL-DOWN BILATÉRAL" in line:
-            start_idx = i - 1
-        if "TAB 5: PEER BENCHMARKS (Q5)" in line:
-            end_idx = i - 1
-            break
-            
-    print(f"Start index: {start_idx} (line {start_idx+1})")
-    print(f"End index: {end_idx} (line {end_idx+1})")
-    
-    new_lines = lines[:start_idx] + [STUDIO_REPLACEMENT + "\n\n"] + lines[end_idx:]
-    app_path.write_text("".join(new_lines), encoding="utf-8")
-    print("Successfully updated src/dashboard/app.py!")
+    print("Notice: apply_studio_update.py is an archived experimental script and has been decommissioned to protect src/dashboard/app.py.")
 
 if __name__ == "__main__":
     main()
