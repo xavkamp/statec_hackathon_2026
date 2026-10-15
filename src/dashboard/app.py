@@ -226,7 +226,7 @@ def create_navigation_boxes():
 
             html.Button([
                 html.I(className="bi bi-calendar-range me-1"),
-                "Q6: Seasonality Lab"
+                "Q6: Seasonality"
             ], id="btn-tab-seasonality", className="nav-tab-btn", n_clicks=0),
         ], className="d-flex flex-wrap align-items-center nav-mode-container")
     ], className="mb-3")
@@ -376,9 +376,10 @@ def render_tab_resilience(selected_year):
                     b_hs4 = hs4_df[(hs4_df["hs2_parent"].isin(chs)) & (hs4_df["flow"] == "IMPORT") & (hs4_df["year"] == hs4_df["year"].max())]
                 if not b_hs4.empty:
                     lead_h4 = b_hs4.sort_values("value_eur", ascending=False).iloc[0]
+                    h4_title = f"HS {lead_h4['hs4_code']}: {lead_h4['hs4_name']}"
                     top_hs4_div = html.Div([
                         html.Span("Leading 4-Digit Good: ", className="small text-muted"),
-                        html.Strong(f"HS {lead_h4['hs4_code']}: {lead_h4['hs4_name'][:26]} ({fmt_eur(lead_h4['value_eur'])})", className="small")
+                        html.Strong(f"{h4_title} ({fmt_eur(lead_h4['value_eur'])})", className="small", title=h4_title)
                     ], className="mb-1")
 
             cards.append(dbc.Col([
@@ -415,8 +416,21 @@ def render_tab_resilience(selected_year):
             hovertemplate="%{y}<br>Supplier Concentration HHI: %{x:.0f}<extra></extra>"
         ))
         apply_plot_theme(fig_comp, x_title="Herfindahl-Hirschman Index (HHI)")
-        fig_comp.add_vline(x=2500, line_dash="dash", line_color=DANGER, annotation_text="HHI = 2,500", annotation_position="top right")
-        fig_comp.add_vline(x=1500, line_dash="dot", line_color=WARNING, annotation_text="HHI = 1,500", annotation_position="bottom right")
+        # Highly visible threshold reference lines at top of graph
+        fig_comp.add_vline(
+            x=1500, line_dash="dash", line_color=WARNING, line_width=2,
+            annotation_text="<b>Threshold: HHI = 1,500 (Moderate)</b>",
+            annotation_position="top left",
+            annotation_font=dict(size=11, color=WARNING, family="Inter, sans-serif"),
+            annotation_bgcolor="#FFFFFF"
+        )
+        fig_comp.add_vline(
+            x=2500, line_dash="dash", line_color=DANGER, line_width=2,
+            annotation_text="<b>Threshold: HHI = 2,500 (High)</b>",
+            annotation_position="top right",
+            annotation_font=dict(size=11, color=DANGER, family="Inter, sans-serif"),
+            annotation_bgcolor="#FFFFFF"
+        )
         # Explicit legend traces for color definitions
         fig_comp.add_trace(go.Bar(name="High Concentration (HHI > 2,500)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
         fig_comp.add_trace(go.Bar(name="Moderate Concentration (1,500–2,500)", x=[None], y=[None], marker_color=WARNING, showlegend=True))
@@ -424,7 +438,7 @@ def render_tab_resilience(selected_year):
         fig_comp.update_layout(
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
-            margin=dict(l=10, r=40, t=30, b=30),
+            margin=dict(l=150, r=50, t=35, b=30),
             yaxis=dict(autorange="reversed")
         )
 
@@ -451,7 +465,7 @@ def render_tab_resilience(selected_year):
         ))
         apply_plot_theme(fig_trajectory, y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
         fig_trajectory.update_yaxes(range=[7, 28])
-        fig_trajectory.update_layout(margin=dict(l=10, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_trajectory.update_layout(margin=dict(l=40, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
         colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
         fig_balance = go.Figure(go.Bar(
@@ -460,21 +474,21 @@ def render_tab_resilience(selected_year):
             hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
         ))
         apply_plot_theme(fig_balance, y_title="Billion Euros (€B)", dtick_x=2)
-        fig_balance.update_layout(margin=dict(l=10, r=20, t=25, b=30))
+        fig_balance.update_layout(margin=dict(l=40, r=20, t=25, b=30))
 
         if "intra_eu_import_share_pct" in kpis_df.columns:
             fig_eu.add_trace(go.Scatter(
                 x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
-                name="Intra-EU Import Share %", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
+                name="EU Import Share", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
             ))
         if "intra_eu_export_share_pct" in kpis_df.columns:
             fig_eu.add_trace(go.Scatter(
                 x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
-                name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
+                name="EU Export Share", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
             ))
-        apply_plot_theme(fig_eu, y_title="Share of Total (%)", dtick_x=2)
+        apply_plot_theme(fig_eu, y_title="Share of Total (%)", dtick_x=5)
         fig_eu.update_yaxes(range=[55, 98])
-        fig_eu.update_layout(margin=dict(l=10, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_eu.update_layout(margin=dict(l=45, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
         v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
         v_sub = kpis_df[kpis_df["year"] == use_year]
@@ -499,20 +513,21 @@ def render_tab_resilience(selected_year):
 
     fig_donut = go.Figure(go.Pie(
         labels=[
-            f"Direct Neighbors (BE, DE, FR) — {neigh_share:.1f}%",
-            f"Other EU Member States — {other_eu_share:.1f}%",
-            f"Rest of World — {row_share:.1f}%"
+            "Direct Neighbors (BE, DE, FR)",
+            "Other EU Member States",
+            "Rest of World"
         ],
         values=[neigh_val, other_eu_val, row_val],
         hole=0.55,
-        marker_colors=[PRIMARY, "#38BDF8", "#94A3B8"],
+        textposition="outside",
         textinfo="label+percent",
-        hovertemplate="%{label}<br>Value: €%{value:,.0f}<br>Share: %{percent}<extra></extra>"
+        marker_colors=[PRIMARY, "#38BDF8", "#94A3B8"],
+        hovertemplate="<b>%{label}</b><br>Value: €%{value:,.0f}<br>Share: %{percent}<extra></extra>"
     ))
     fig_donut.update_layout(
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=15, r=15, t=30, b=15),
-        font=dict(family="Inter, sans-serif", size=11, color=TEXT_PRIMARY),
+        margin=dict(l=35, r=35, t=30, b=30),
+        font=dict(family="Inter, sans-serif", size=10, color=TEXT_PRIMARY),
         showlegend=False
     )
 
@@ -520,6 +535,7 @@ def render_tab_resilience(selected_year):
     fig_non_eu = go.Figure()
     if not non_eu_sub.empty:
         non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
+        max_val_m = (non_eu_sub['value_eur'] / 1e6).max()
         fig_non_eu.add_trace(go.Bar(
             x=non_eu_sub['value_eur'] / 1e6,
             y=non_eu_sub['name_en'],
@@ -530,14 +546,15 @@ def render_tab_resilience(selected_year):
             hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
         ))
         apply_plot_theme(fig_non_eu, x_title="Million Euros (€M)")
-        fig_non_eu.update_layout(margin=dict(l=10, r=35, t=10, b=30), yaxis=dict(autorange="reversed"))
+        fig_non_eu.update_xaxes(range=[0, max_val_m * 1.25])
+        fig_non_eu.update_layout(margin=dict(l=110, r=55, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     return html.Div([
         create_compact_kpi_ribbon(use_year),
 
         # Section 1: Macro Trajectory & Geopolitical Origins
         create_section_header(
-            f"MACRO TRAJECTORY & GEOPOLITICAL ORIGINS ({use_year})",
+            "MACRO TRAJECTORY & GEOPOLITICAL ORIGINS",
             f"25-Year merchandise trade trajectory ({vol_growth_pct:+.1f}% volume growth vs 2000), trade balance evolution, EU Single Market integration, and third-country supplier exposure.",
             badge_text="Macro & Geopolitics",
             badge_color=STATEC_NAVY
@@ -586,7 +603,7 @@ def render_tab_resilience(selected_year):
         # Section 2: Critical Supply Baskets & Concentration
         create_section_header(
             f"CRITICAL IMPORT BASKETS & SUPPLIER CONCENTRATION ({use_year})",
-            "Supplier concentration and Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
+            "Supplier concentration estimated by Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
             badge_text="Merchandise Baskets",
             badge_color=STATEC_NAVY,
             info_title="Herfindahl-Hirschman Index (HHI) Calculation",
@@ -636,7 +653,7 @@ def render_tab_stress(selected_year=None):
 def render_tab_partners(selected_year):
     return html.Div([
         create_section_header(
-            f"Q1: TRADING PARTNERS & BILATERAL FLOWS ({selected_year})",
+            "Q1: TRADING PARTNERS & BILATERAL FLOWS",
             "Who are Luxembourg's main trading partners? How have they evolved over time? Click any country bar below to instantly inspect top products traded with that country."
         ),
 
@@ -821,7 +838,9 @@ def update_q1_charts(flow, scope, metric, selected_partner, is_expanded, year):
         hovertemplate="<b>%{y} (%{customdata})</b><br>Value: " + ("%{x:.2f}%" if metric == "share" else "€%{x:,.1f}M") + "<extra></extra>"
     ))
     apply_plot_theme(fig_bar, x_title="Market Share (%)" if metric == "share" else "Million Euros (€M)")
-    fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+    max_x_val = float(x_col.max()) if not x_col.empty else 100
+    fig_bar.update_xaxes(range=[0, max_x_val * 1.25])
+    fig_bar.update_layout(margin=dict(l=120, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     # Map
     sub_map = add_iso3_column(sub).dropna(subset=["iso3"]).copy()
@@ -1056,7 +1075,7 @@ def update_q2_charts(flow, granularity, selected_prod, year):
         if sub.empty:
             sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
-        top["label"] = "HS " + top["hs4_code"] + ": " + top["hs4_name"].apply(lambda s: str(s)[:28] + ".." if len(str(s)) > 28 else str(s))
+        top["label"] = "HS " + top["hs4_code"] + ": " + top["hs4_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
         code_col = top["hs4_code"]
     else:
         prod_df = load_product_rankings()
@@ -1064,7 +1083,7 @@ def update_q2_charts(flow, granularity, selected_prod, year):
         if sub.empty:
             sub = prod_df[(prod_df["year"] == prod_df["year"].max()) & (prod_df["flow"] == flow)].copy()
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
-        top["label"] = "Ch. " + top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:28] + ".." if len(str(s)) > 28 else str(s))
+        top["label"] = "Ch. " + top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
         code_col = top["hs2_code"]
 
     bar_colors = [STATEC_YELLOW if str(c) == str(selected_prod) else (SECONDARY if flow == "IMPORT" else PRIMARY) for c in code_col]
@@ -1080,7 +1099,9 @@ def update_q2_charts(flow, granularity, selected_prod, year):
         hovertemplate="<b>%{y}</b><br>Trade Value: €%{x:,.1f}M<extra></extra>"
     ))
     apply_plot_theme(fig_bar, x_title="Million Euros (€M)")
-    fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+    max_val_m = (top["value_eur"] / 1e6).max() if not top.empty else 100
+    fig_bar.update_xaxes(range=[0, max_val_m * 1.25])
+    fig_bar.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     # Structural shift chart: dynamically track top 5 product categories for this flow in the selected year
     all_prod = load_product_rankings()
@@ -1352,7 +1373,7 @@ def render_tab_q4_drilldown(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
                     )
-                ], md=3),
+                ], md=2),
 
                 dbc.Col([
                     html.Label("TARIFF GRANULARITY LEVEL:", className="control-label"),
@@ -1361,16 +1382,16 @@ def render_tab_q4_drilldown(selected_year):
                         options=[
                             {"label": "HS2 (Chapters)", "value": 2},
                             {"label": "HS4 (Subheadings)", "value": 4},
-                            {"label": "CN8 (Detailed 8-Digit)", "value": 8},
+                            {"label": "CN8 (Detailed)", "value": 8},
                         ],
                         value=4,
                         inline=True,
-                        className="btn-group",
+                        className="btn-group d-flex",
                         input_class_name="btn-check",
-                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
-                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
+                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1 flex-fill",
+                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold flex-fill",
                     )
-                ], md=3),
+                ], md=4),
 
                 dbc.Col([
                     html.Label("SIGNIFICANCE FILTER:", className="control-label"),
@@ -1423,17 +1444,36 @@ def update_q4_chart(partner_code, flow, level, threshold, year):
 
     sub = df[(df["partner_code"] == partner_code) & (df["flow"] == flow)].copy()
     if sub.empty:
-        # Fallback to level 2
+        # Fallback to level 2 drilldown
         df2 = load_drilldown_lvl2()
         sub = df2[(df2["partner_code"] == partner_code) & (df2["flow"] == flow)].copy()
         level = 2
+
+    if sub.empty:
+        # Fallback to product_partners (which covers all 237 partner countries)
+        pp_df = load_product_partners()
+        sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)].copy()
+        if sub_pp.empty:
+            sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow)].copy()
+            if not sub_pp.empty:
+                sub_pp = sub_pp[sub_pp["year"] == sub_pp["year"].max()]
+        if not sub_pp.empty:
+            sub = pd.DataFrame({
+                "partner_code": sub_pp["partner_code"],
+                "flow": sub_pp["flow"],
+                "product_code": sub_pp["hs2_code"],
+                "product_name": sub_pp["hs2_name"],
+                "value_eur": sub_pp["value_eur"],
+                "level": 2
+            })
+            level = 2
 
     if threshold in [15, 25]:
         sub = sub.sort_values("value_eur", ascending=False).head(int(threshold)).copy()
     else:
         sub = sub[sub["value_eur"] >= float(threshold)].sort_values("value_eur", ascending=False).head(30).copy()
 
-    sub["label"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: str(s)[:45] + ".." if len(str(s)) > 45 else str(s))
+    sub["label"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: str(s)[:38] + ".." if len(str(s)) > 38 else str(s))
 
     fig = go.Figure(go.Bar(
         x=sub["value_eur"] / 1e6,
@@ -1445,7 +1485,9 @@ def update_q4_chart(partner_code, flow, level, threshold, year):
         hovertemplate="<b>%{y}</b><br>Value: €%{x:,.2f}M<extra></extra>"
     ))
     apply_plot_theme(fig, x_title="Million Euros (€M)")
-    fig.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+    max_val_m = (sub["value_eur"] / 1e6).max() if not sub.empty else 100
+    fig.update_xaxes(range=[0, max_val_m * 1.25])
+    fig.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     title = f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()})"
     return title, fig
@@ -1477,7 +1519,7 @@ def render_tab_benchmarks(selected_year):
     apply_plot_theme(fig_index, y_title="Index (2000 = 100)", dtick_x=2, hovermode="x unified")
     fig_index.update_yaxes(range=[80, 400])
     fig_index.update_layout(
-        margin=dict(l=10, r=20, t=25, b=30),
+        margin=dict(l=55, r=20, t=25, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
     )
 
@@ -1499,15 +1541,22 @@ def render_tab_benchmarks(selected_year):
     ))
     parity_threshold = 100.0
     apply_plot_theme(fig_cov, x_title="Coverage Ratio (%)")
-    fig_cov.add_vline(x=parity_threshold, line_dash="dash", line_color=SUCCESS, annotation_text=f"Trade Balance Parity ({parity_threshold:.0f}%)")
+    fig_cov.add_vline(
+        x=parity_threshold, line_dash="dash", line_color=SUCCESS, line_width=1.5,
+        annotation_text="<b>Parity: 100%</b>",
+        annotation_position="top left",
+        annotation_font=dict(size=10, color=SUCCESS, family="Inter, sans-serif"),
+        annotation_bgcolor="#FFFFFF"
+    )
     # Legend traces for coverage ratio categories
     fig_cov.add_trace(go.Bar(name="Luxembourg", x=[None], y=[None], marker_color=STATEC_YELLOW, showlegend=True))
     fig_cov.add_trace(go.Bar(name="Trade Surplus (Ratio ≥ 100%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
     fig_cov.add_trace(go.Bar(name="Trade Deficit (Ratio < 100%)", x=[None], y=[None], marker_color=SECONDARY, showlegend=True))
+    fig_cov.update_xaxes(range=[0, 135])
     fig_cov.update_layout(
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
-        margin=dict(l=10, r=40, t=25, b=30),
+        margin=dict(l=100, r=45, t=25, b=30),
         yaxis=dict(autorange="reversed")
     )
 
@@ -1555,7 +1604,7 @@ def render_tab_seasonality():
 
     return html.Div([
         create_section_header(
-            "Q6: ECONOMETRIC SEASONALITY & TREND LAB",
+            "Q6: ECONOMETRIC SEASONALITY & TREND",
             "Do Luxembourg's trade flows exhibit specific seasonal patterns? Decomposes monthly trade into raw observed series, 12-month centered rolling trends, and seasonally adjusted series."
         ),
 

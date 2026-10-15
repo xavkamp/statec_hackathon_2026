@@ -376,7 +376,6 @@ def create_dashboard_footer():
             html.Div([
                 html.Span("TRADE", className="footer-logo-title"),
                 html.Span(".lu", className="footer-logo-accent"),
-                html.Span("INDEPENDENT EXTERNAL TRADE OBSERVATORY", className="footer-logo-sub"),
             ], className="mb-3 mb-md-0"),
 
             html.Div([
