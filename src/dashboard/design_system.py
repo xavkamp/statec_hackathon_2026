@@ -619,19 +619,21 @@ def create_dashboard_footer():
     return html.Footer([
         html.Div([
             html.Div([
-                html.Span("TRADE", className="footer-logo-title"),
-                html.Span(".lu", className="footer-logo-accent"),
-            ], className="mb-3 mb-md-0"),
+                html.Div([
+                    html.Span("HACKATHON", className="footer-logo-title"),
+                    html.Span("26", className="footer-logo-accent"),
+                ], className="ms-2 d-inline-flex align-items-baseline"),
+            ], className="d-flex align-items-center mb-3 mb-md-0"),
 
             html.Div([
                 html.Span(f"Data sources: Eurostat Comext [ds-045409] & STATEC Open Data ({START_YEAR}–{END_YEAR})", className="footer-source-text"),
-                html.Span("Analytical Research Project • Hackathon 2026 (Unofficial Prototype)", className="footer-proto-text"),
+                html.Span("Analytical Research Platform • STATEC Hackathon 2026 (Institutional Prototype)", className="footer-proto-text"),
             ], className="text-md-end text-start"),
         ], className="d-flex flex-column flex-md-row justify-content-between align-items-md-center py-4 footer-inner"),
 
         html.Div([
-            html.P("Disclaimer: This dashboard is an exploratory analytical research prototype created for the STATEC Hackathon 2026. It is not an official website or product of STATEC or the Government of the Grand Duchy of Luxembourg.", className="app-disclaimer-bar")
-        ])
+            html.P("This dashboard is a prototype created for the STATEC Hackathon 2026.", className="app-disclaimer-bar")
+        ], className="app-disclaimer-wrap")
     ], className="app-footer")
 
 

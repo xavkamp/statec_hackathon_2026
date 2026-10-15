@@ -169,30 +169,48 @@ def create_header():
     min_yr = year_list[-1] if year_list else START_YEAR
     max_yr = year_list[0] if year_list else END_YEAR
 
-    return html.Div([
+    return html.Header([
+        # Top Institutional Micro-Strip (harmonized with footer's bottom disclaimer bar)
+        html.Div([
+            dbc.Container([
+                html.Div([
+                    html.Div([
+                        html.Span("TEAM", className="topstrip-item-bold"),
+                        html.Span("•", className="topstrip-sep"),
+                        html.Span("SCRAPPED", className="topstrip-item"),
+                    ], className="d-flex align-items-center"),
+                    html.Div([
+                        html.Span([
+                            "This dashboard is a prototype created for the STATEC Hackathon 2026."
+                        ], className="topstrip-item")
+                    ], className="d-none d-md-block")
+                ], className="d-flex justify-content-between align-items-center topstrip-inner")
+            ], fluid=True, className="app-container-max")
+        ], className="app-header-topstrip"),
+
+        # Main Header Banner (harmonized with footer's midnight navy and gold border)
         html.Div([
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
                         html.Div([
-                            create_icon_badge("bi bi-shield-check", color=STATEC_NAVY, bg="#FFF9E6", size=20, box_size=40),
                             html.Div([
-                                html.Span("TRADE", className="brand-logo"),
-                                html.Span(".lu", className="brand-accent"),
-                            ], className="ms-2"),
+                                html.Span("HACKATHON", className="brand-logo"),
+                                html.Span("26", className="brand-accent"),
+                            ], className="ms-2 d-flex align-items-baseline"),
                             html.Div(className="brand-divider d-none d-lg-block"),
                             html.Div([
-                                html.Span("LUXEMBOURG EXTERNAL TRADE INTELLIGENCE", className="portal-title"),
-                                html.Span(f"Eurostat Comext Open Data [ds-045409] ({min_yr}–{max_yr})", className="portal-subtitle"),
+                                html.Span("LUXEMBOURG'S EXTERNAL TRADE RADAR", className="portal-title"),
+                                html.Span(f"Eurostat Comext Open Data [ds-045409]: timeseries ({min_yr}–{max_yr})", className="portal-subtitle"),
                             ], className="d-none d-lg-block"),
-                        ], className="d-flex align-items-center py-2")
+                        ], className="d-flex align-items-center py-3")
                     ], md=8),
 
                     dbc.Col([
                         html.Div([
                             html.Div([
                                 html.Label([
-                                    html.I(className="bi bi-calendar3 me-1 text-primary"),
+                                    html.I(className="bi bi-calendar3 me-1 text-warning"),
                                     "ANALYSIS YEAR"
                                 ], className="header-filter-label"),
                                 dcc.Dropdown(
@@ -208,7 +226,7 @@ def create_header():
                 ], className="align-items-center")
             ], fluid=True, className="app-container-max")
         ], className="app-header-main")
-    ])
+    ], className="app-header")
 
 
 # ── Compact Key Figures Ribbon in Leadership View ─────────────────
@@ -2257,6 +2275,7 @@ def render_tab_seasonality():
                 create_infobox_item("Detrending", "Multiplicative Detrending", "Raw monthly imports and exports are divided by the 12M trend to isolate seasonal ratios (Ratio = Value / Trend).", badge_variant="blue"),
                 create_infobox_item("Robust Median", "Shock-Resistant Seasonal Factors", "For each calendar month, the multi-year median ratio across the observation window is calculated (normalized to 100% mean), resisting economic shocks (e.g. COVID-19, 2022 energy crisis).", badge_variant="blue"),
                 create_infobox_item("SA Series", "Seasonally Adjusted Series", "SA = Value / Factor. For net Trade Balance (which crosses zero), monthly additive deviation vs trend (€M) is used instead of ratios.", badge_variant="blue"),
+                create_infobox_item("Fig 5.2 Metric", "Figure 5.2: Monthly Seasonal Deviation Measure", "For Imports and Exports, bars display the percentage deviation from the 12-month annual trend ((Seasonal Factor - 1.0) × 100%). Positive bars highlight peak trading months; negative bars indicate seasonal slowdowns (e.g. August Congé Collectif). For Trade Balance, bars show the average net euro deviation (€M) vs trend (deficit widening vs narrowing).", badge_variant="blue"),
             ]
         ),
 
@@ -2465,20 +2484,6 @@ def update_seasonality_charts(product, flow, selected_series):
         fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
         fig_factors.add_trace(go.Bar(name=f"Deficit Widening (< -€{thresh_m:.1f}M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
         y_vals = dev_m
-
-        aug_row = factors[factors["month"] == 8]
-        if not aug_row.empty:
-            aug_val = float(aug_row.iloc[0]["seasonal_dev_eur"] / 1e6)
-            aug_title = "August Slump" if aug_val < 0 else "August Activity"
-            fig_factors.add_annotation(
-                x="Aug", y=aug_val,
-                text=f"<b>{aug_title} ({aug_val:+.1f}M)</b><br>Congé effect",
-                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
-                arrowcolor=SUCCESS if aug_val > 0 else DANGER,
-                ax=0, ay=-35 if aug_val > 0 else 35,
-                bgcolor="#F8FAFC", bordercolor="#94A3B8", borderwidth=1, borderpad=3,
-                font=dict(size=9, color="#1E293B", family="Inter, sans-serif")
-            )
     else:
         factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
@@ -2500,40 +2505,8 @@ def update_seasonality_charts(product, flow, selected_series):
         fig_factors.add_trace(go.Bar(name="August Slump", x=[None], y=[None], marker_color=DANGER, showlegend=True))
         y_vals = dev_pct
 
-        aug_row = factors[factors["month"] == 8]
-        if not aug_row.empty:
-            aug_val = float((aug_row.iloc[0]["seasonal_factor"] - 1.0) * 100)
-            aug_title = "August Slump" if aug_val < 0 else "August Peak"
-            fig_factors.add_annotation(
-                x="Aug", y=aug_val,
-                text=f"<b>{aug_title} ({aug_val:+.1f}%)</b><br>Congé Collectif",
-                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
-                arrowcolor=DANGER if aug_val < 0 else SUCCESS,
-                ax=0, ay=38 if aug_val < 0 else -38,
-                bgcolor="#FEF2F2" if aug_val < 0 else "#F0FDF4",
-                bordercolor=DANGER if aug_val < 0 else SUCCESS,
-                borderwidth=1, borderpad=3,
-                font=dict(size=9, color="#991B1B" if aug_val < 0 else "#166534", family="Inter, sans-serif")
-            )
-
-        max_idx = dev_pct.idxmax()
-        peak_row = factors.loc[max_idx]
-        if peak_row["month"] != 8:
-            peak_val = float(dev_pct.loc[max_idx])
-            peak_m_name = peak_row["month_name"]
-            season_tag = "Spring Peak" if peak_row["month"] in [3, 4, 5] else ("Autumn Peak" if peak_row["month"] in [9, 10, 11] else ("Winter Peak" if peak_row["month"] in [12, 1, 2] else "Summer Peak"))
-            fig_factors.add_annotation(
-                x=peak_m_name, y=peak_val,
-                text=f"<b>{season_tag} ({peak_val:+.1f}%)</b><br>{peak_m_name} Activity",
-                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5,
-                arrowcolor=SUCCESS,
-                ax=0, ay=-38 if peak_val > 0 else 38,
-                bgcolor="#F0FDF4", bordercolor=SUCCESS, borderwidth=1, borderpad=3,
-                font=dict(size=9, color="#166534", family="Inter, sans-serif")
-            )
-
     y_min, y_max = float(y_vals.min()), float(y_vals.max())
-    y_pad = max(abs(y_min), abs(y_max), 5.0) * 0.45
+    y_pad = max(abs(y_min), abs(y_max), 5.0) * 0.18
     fig_factors.update_yaxes(range=[y_min - y_pad, y_max + y_pad])
     fig_factors.update_layout(
         showlegend=True,

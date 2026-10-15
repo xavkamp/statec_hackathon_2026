@@ -65,21 +65,22 @@ def test_q5_cagr_badges():
     assert cagr_badges is not None
     print(f"[PASS] Q5 CAGR badges generated: '{t_left}'")
 
-def test_seasonality_balance_and_annotations():
-    print("\nTesting Q6 Seasonality Lab with Trade Balance and Annotations...")
+def test_seasonality_balance_and_clean_factors():
+    print("\nTesting Q6 Seasonality Lab with Trade Balance and Clean Factors...")
     fig_decomp, fig_factors = update_seasonality_charts("TOTAL", "BALANCE", ["raw", "trend", "seasonally_adjusted"])
     assert fig_decomp is not None and fig_factors is not None
-    assert len(fig_factors.layout.annotations) > 0
-    print("[PASS] Seasonality Decomposition & Monthly Factors generated for BALANCE with annotations")
+    # Verify text annotations were removed from Figure 5.2 as requested
+    assert len(fig_factors.layout.annotations or []) == 0
+    print("[PASS] Seasonality Decomposition & Monthly Factors generated for BALANCE with clean layout (no text annotations)")
 
     fig_ts_imp, fig_fact_imp = update_seasonality_charts("TOTAL", "IMPORT", ["raw", "trend"])
     assert fig_ts_imp is not None and fig_fact_imp is not None
-    assert len(fig_fact_imp.layout.annotations) >= 2
-    print(f"[PASS] Seasonality IMPORT factors generated with {len(fig_fact_imp.layout.annotations)} callout annotations")
+    assert len(fig_fact_imp.layout.annotations or []) == 0
+    print("[PASS] Seasonality IMPORT factors generated with clean bars (no text annotations)")
 
 if __name__ == "__main__":
     test_all_tabs()
     test_q2_hhi_and_charts()
     test_q5_cagr_badges()
-    test_seasonality_balance_and_annotations()
+    test_seasonality_balance_and_clean_factors()
     print("\nALL 5 ACTIVE TABS AND REGRESSION TESTS PASSED PERFECTLY!")
