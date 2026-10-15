@@ -10,3 +10,4 @@ data/bronze/*.json
 
 # Staging & exploratory scratch workspace
 scratch/
+.agents/
