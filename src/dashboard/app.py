@@ -207,22 +207,12 @@ def create_navigation_boxes():
                 ], id="btn-mode-deepdive", className="nav-mode-btn", n_clicks=0),
             ], className="nav-mode-bar"),
 
-            # Sub-row: 3 Resilience Radar buttons (shown when Resilience Radar is active)
+            # Sub-row: Resilience Radar button (shown when Resilience Radar is active)
             html.Div([
                 html.Button([
                     html.I(className="bi bi-shield-check me-1 text-warning"),
-                    "1. Product Baskets & Concentration"
+                    "Sovereign Supply & Geopolitical Resilience"
                 ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
-
-                html.Button([
-                    html.I(className="bi bi-globe-europe-africa me-1 text-info"),
-                    "2. Macro Trajectory & Geopolitical Origins"
-                ], id="btn-tab-geopolitics", className="nav-tab-btn", n_clicks=0),
-
-                html.Button([
-                    html.I(className="bi bi-lightning-charge me-1 text-danger"),
-                    "3. Historical Shock Scenarios"
-                ], id="btn-tab-stress", className="nav-tab-btn", n_clicks=0),
             ], id="nav-group-resilience", className="d-flex flex-wrap nav-subtabs-container"),
 
             # Sub-row: 6 Deep-Dive buttons (shown when Deep-Dive is active)
@@ -277,14 +267,12 @@ app.layout = html.Div([
 
 # ── Active Tab Navigation Router ───────────────────────────────────────────
 ALL_TAB_BTNS = [
-    "btn-tab-resilience", "btn-tab-geopolitics", "btn-tab-stress",
+    "btn-tab-resilience",
     "btn-tab-partners", "btn-tab-products", "btn-tab-q3-partners",
     "btn-tab-q4-drilldown", "btn-tab-benchmarks", "btn-tab-seasonality"
 ]
 TAB_ID_MAP = {
     "btn-tab-resilience": "tab-resilience",
-    "btn-tab-geopolitics": "tab-geopolitics",
-    "btn-tab-stress": "tab-stress",
     "btn-tab-partners": "tab-partners",
     "btn-tab-products": "tab-products",
     "btn-tab-q3-partners": "tab-q3-partners",
@@ -292,7 +280,7 @@ TAB_ID_MAP = {
     "btn-tab-benchmarks": "tab-benchmarks",
     "btn-tab-seasonality": "tab-seasonality"
 }
-RESILIENCE_TABS = ["tab-resilience", "tab-geopolitics", "tab-stress"]
+RESILIENCE_TABS = ["tab-resilience"]
 DEEPDIVE_TABS = ["tab-partners", "tab-products", "tab-q3-partners", "tab-q4-drilldown", "tab-benchmarks", "tab-seasonality"]
 
 
@@ -359,12 +347,6 @@ def switch_active_nav_tab(mode_res_clk, mode_dd_clk, *args):
 def render_main_tab_content(active_tab, selected_year):
     if active_tab == "tab-resilience":
         return render_tab_resilience(selected_year)
-    elif active_tab == "tab-macro":
-        return render_tab_macro(selected_year)
-    elif active_tab == "tab-geopolitics":
-        return render_tab_geopolitics(selected_year)
-    elif active_tab == "tab-stress":
-        return render_tab_stress(selected_year)
     elif active_tab == "tab-partners":
         return render_tab_partners(selected_year)
     elif active_tab == "tab-products":
@@ -377,15 +359,20 @@ def render_main_tab_content(active_tab, selected_year):
         return render_tab_benchmarks(selected_year)
     elif active_tab == "tab-seasonality":
         return render_tab_seasonality()
-    return html.Div("Loading tab...")
+    return render_tab_resilience(selected_year)
 
 
 # ───────────────────────────────────────────────────────────────────────────
 # TAB 1: SOVEREIGN SUPPLY RESILIENCE RADAR (Pillars 3–5)
 # ───────────────────────────────────────────────────────────────────────────
+
+
 def render_tab_resilience(selected_year):
     pp_df = load_product_partners()
-    if pp_df.empty:
+    kpis_df = load_overview_kpis()
+    partners_df = load_partner_rankings()
+    hs4_df = load_hs4_product_rankings()
+    if pp_df.empty and kpis_df.empty:
         return html.Div("Resilience data not available.")
 
     BASKETS = {
@@ -491,52 +478,12 @@ def render_tab_resilience(selected_year):
             yaxis=dict(autorange="reversed")
         )
 
-    return html.Div([
-        create_compact_kpi_ribbon(use_year),
-
-        create_section_header(
-            f"IMPORT BASKETS CONCENTRATION ({use_year})",
-            "Supplier concentration and Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
-            badge_text="Merchandise Baskets",
-            badge_color=STATEC_NAVY,
-            info_title="Herfindahl-Hirschman Index (HHI) Calculation",
-            info_content=[
-                html.P("The HHI measures supplier concentration as the sum of squared market shares of supplying nations:", className="fw-semibold mb-1"),
-                html.Ul([
-                    html.Li("HHI < 1,500: Low concentration"),
-                    html.Li("1,500 – 2,500: Moderate concentration"),
-                    html.Li("HHI > 2,500: High concentration"),
-                ], className="ps-3 mb-0")
-            ]
-        ),
-
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_comp, config={"displayModeBar": False})
-                ], className="dash-card")
-            ], md=12)
-        ]),
-
-        dbc.Row(cards)
-    ])
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 2: MACROECONOMIC TRAJECTORY & GEOPOLITICAL ORIGINS
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_macro(selected_year):
-    return render_tab_geopolitics(selected_year)
-
-
-def render_tab_geopolitics(selected_year):
-    kpis_df = load_overview_kpis()
-    partners_df = load_partner_rankings()
-    if kpis_df.empty and partners_df.empty:
-        return html.Div("Macro & Geopolitical data not available.")
-
-    # 1. 25-Year Trajectory
+    # Macroeconomic Trajectory & Geopolitical Origin Figures
     fig_trajectory = go.Figure()
+    fig_balance = go.Figure()
+    fig_eu = go.Figure()
+    vol_growth_pct = 0.0
+
     if not kpis_df.empty:
         fig_trajectory.add_trace(go.Scatter(
             x=kpis_df["year"], y=kpis_df["IMPORT"] / 1e9,
@@ -554,7 +501,6 @@ def render_tab_geopolitics(selected_year):
         ))
         apply_plot_theme(fig_trajectory, title="25-Year Trajectory of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
 
-        # 2. Trade Balance
         colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
         fig_balance = go.Figure(go.Bar(
             x=kpis_df["year"], y=kpis_df["trade_balance_eur"] / 1e9,
@@ -563,8 +509,6 @@ def render_tab_geopolitics(selected_year):
         ))
         apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (€B)", y_title="Billion Euros (€B)", dtick_x=2)
 
-        # 3. EU Integration Share
-        fig_eu = go.Figure()
         if "intra_eu_import_share_pct" in kpis_df.columns:
             fig_eu.add_trace(go.Scatter(
                 x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
@@ -578,27 +522,27 @@ def render_tab_geopolitics(selected_year):
         apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
         fig_eu.update_yaxes(range=[55, 95])
         fig_eu.update_layout(margin=dict(l=10, r=20, t=35, b=30))
-    else:
-        fig_trajectory, fig_balance, fig_eu = go.Figure(), go.Figure(), go.Figure()
 
-    # 4. Regional Origin Donut & Non-EU Suppliers
-    sub = partners_df[(partners_df["year"] == selected_year) & (partners_df["flow"] == "IMPORT")].copy()
-    if sub.empty:
-        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
+        v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
+        v_sub = kpis_df[kpis_df["year"] == use_year]
+        v_end = v_sub["trade_volume_eur"].iloc[0] if not v_sub.empty else kpis_df["trade_volume_eur"].iloc[-1]
+        vol_growth_pct = ((v_end / v_start) - 1.0) * 100 if v_start > 0 else 0.0
+
+    # Regional Origin Donut & Non-EU Suppliers
+    sub_geo = partners_df[(partners_df["year"] == use_year) & (partners_df["flow"] == "IMPORT")].copy()
+    if sub_geo.empty and not partners_df.empty:
+        sub_geo = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
 
     eu_codes = {'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'}
     neighbors = {'BE', 'DE', 'FR'}
-    tot_imp = sub['value_eur'].sum()
-    neigh_val = sub[sub['partner_code'].isin(neighbors)]['value_eur'].sum()
-    other_eu_val = sub[sub['partner_code'].isin(eu_codes - neighbors)]['value_eur'].sum()
+    tot_imp = sub_geo['value_eur'].sum() if not sub_geo.empty else 0.0
+    neigh_val = sub_geo[sub_geo['partner_code'].isin(neighbors)]['value_eur'].sum() if not sub_geo.empty else 0.0
+    other_eu_val = sub_geo[sub_geo['partner_code'].isin(eu_codes - neighbors)]['value_eur'].sum() if not sub_geo.empty else 0.0
     row_val = max(0, tot_imp - (neigh_val + other_eu_val))
 
     neigh_share = (neigh_val / tot_imp * 100) if tot_imp > 0 else 0.0
     other_eu_share = (other_eu_val / tot_imp * 100) if tot_imp > 0 else 0.0
     row_share = (row_val / tot_imp * 100) if tot_imp > 0 else 0.0
-
-    non_eu_sub = sub[~sub['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8).copy()
-    non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
 
     fig_donut = go.Figure(go.Pie(
         labels=[
@@ -619,28 +563,28 @@ def render_tab_geopolitics(selected_year):
         showlegend=False
     )
 
-    fig_non_eu = go.Figure(go.Bar(
-        x=non_eu_sub['value_eur'] / 1e6,
-        y=non_eu_sub['name_en'],
-        orientation='h',
-        marker_color="#8B5CF6",
-        text=non_eu_sub['market_share_pct'].apply(lambda p: f"{p:.2f}%"),
-        textposition="outside",
-        hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
-    ))
-    apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
-    fig_non_eu.update_layout(margin=dict(l=10, r=35, t=35, b=30), yaxis=dict(autorange="reversed"))
-
-    vol_growth_pct = 0.0
-    if not kpis_df.empty:
-        v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
-        v_sub = kpis_df[kpis_df["year"] == selected_year]
-        v_end = v_sub["trade_volume_eur"].iloc[0] if not v_sub.empty else kpis_df["trade_volume_eur"].iloc[-1]
-        vol_growth_pct = ((v_end / v_start) - 1.0) * 100 if v_start > 0 else 0.0
+    non_eu_sub = sub_geo[~sub_geo['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8).copy() if not sub_geo.empty else pd.DataFrame()
+    fig_non_eu = go.Figure()
+    if not non_eu_sub.empty:
+        non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
+        fig_non_eu.add_trace(go.Bar(
+            x=non_eu_sub['value_eur'] / 1e6,
+            y=non_eu_sub['name_en'],
+            orientation='h',
+            marker_color="#8B5CF6",
+            text=non_eu_sub['market_share_pct'].apply(lambda p: f"{p:.2f}%"),
+            textposition="outside",
+            hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
+        ))
+        apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
+        fig_non_eu.update_layout(margin=dict(l=10, r=35, t=35, b=30), yaxis=dict(autorange="reversed"))
 
     return html.Div([
+        create_compact_kpi_ribbon(use_year),
+
+        # Section 1: Macro Trajectory & Geopolitical Origins
         create_section_header(
-            f"MACRO TRAJECTORY & GEOPOLITICAL ORIGINS ({selected_year})",
+            f"MACRO TRAJECTORY & GEOPOLITICAL ORIGINS ({use_year})",
             f"25-Year merchandise trade trajectory ({vol_growth_pct:+.1f}% volume growth vs 2000), trade balance evolution, EU Single Market integration, and third-country supplier exposure.",
             badge_text="Macro & Geopolitics",
             badge_color=STATEC_NAVY
@@ -676,229 +620,52 @@ def render_tab_geopolitics(selected_year):
                     dcc.Graph(figure=fig_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
-        ])
-    ])
+        ], className="mb-4"),
 
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 4: STRESS TESTS & SHOCK SIMULATION ENGINE (Adapt & Recover)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_stress(selected_year):
-    return html.Div([
+        # Section 2: Critical Supply Baskets & Concentration
         create_section_header(
-            "HISTORICAL SHOCK SCENARIOS & SIMULATION",
-            "Observed variations in trade flows during historical market disruptions (COVID-19 2020, Energy Shock 2022) and forward maritime simulation.",
-            badge_text="Shock Scenarios",
-            badge_color=STATEC_NAVY
+            f"CRITICAL IMPORT BASKETS & SUPPLIER CONCENTRATION ({use_year})",
+            "Supplier concentration and Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
+            badge_text="Merchandise Baskets",
+            badge_color=STATEC_NAVY,
+            info_title="Herfindahl-Hirschman Index (HHI) Calculation",
+            info_content=[
+                html.P("The HHI measures supplier concentration as the sum of squared market shares of supplying nations:", className="fw-semibold mb-1"),
+                html.Ul([
+                    html.Li("HHI < 1,500: Low concentration"),
+                    html.Li("1,500 – 2,500: Moderate concentration"),
+                    html.Li("HHI > 2,500: High concentration"),
+                ], className="ps-3 mb-0")
+            ]
         ),
 
-        # Scenario Controls Ribbon
-        html.Div([
-            dbc.Row([
-                dbc.Col([
-                    html.Label("SHOCK SCENARIO:", className="control-label"),
-                    dbc.RadioItems(
-                        id="stress-scenario-radio",
-                        options=[
-                            {"label": "COVID-19 Disruption (2020)", "value": "covid"},
-                            {"label": "Energy Shock (2022)", "value": "gas"},
-                            {"label": "Maritime Transit Scenario (Model 2026)", "value": "hormuz"},
-                        ],
-                        value="gas",
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-primary btn-sm px-3 py-1",
-                        label_checked_class_name="btn btn-primary btn-sm px-3 py-1 text-white fw-bold",
-                    )
-                ], md=8),
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(figure=fig_comp, config={"displayModeBar": False})
+                ], className="dash-card")
+            ], md=12)
+        ]),
 
-                dbc.Col([
-                    html.Label("PORT TRANSIT FILTER:", className="control-label"),
-                    dbc.Checklist(
-                        id="stress-lookthrough-check",
-                        options=[{"label": "Exclude direct BE/NL transit flows", "value": "lookthrough"}],
-                        value=[],
-                        switch=True,
-                        className="fw-semibold text-primary"
-                    )
-                ], md=4)
-            ], align="center")
-        ], className="control-ribbon"),
-
-        html.Div(id="stress-test-results-container")
+        dbc.Row(cards)
     ])
 
 
-@callback(
-    Output("stress-test-results-container", "children"),
-    Input("stress-scenario-radio", "value"),
-    Input("stress-lookthrough-check", "value")
-)
-def update_stress_test_view(scenario, lookthrough_val):
-    is_lookthrough = "lookthrough" in (lookthrough_val or [])
+# ───────────────────────────────────────────────────────────────────────────
+# COMPATIBILITY ALIASES FOR MERGED RESILIENCE VIEW
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_macro(selected_year):
+    return render_tab_resilience(selected_year)
 
-    part_df = load_partner_rankings()
-    sea_df = load_seasonal_decomposition()
 
-    # Precalculate dynamic scenario metrics from processed datasets
-    # 1. COVID (2019 vs 2020)
-    p19 = part_df[(part_df["year"] == 2019) & (part_df["flow"] == "IMPORT")].set_index("partner_code")
-    p20 = part_df[(part_df["year"] == 2020) & (part_df["flow"] == "IMPORT")].set_index("partner_code")
+def render_tab_geopolitics(selected_year):
+    return render_tab_resilience(selected_year)
 
-    covid_shifts = []
-    for c_code, c_name in [("DE", "Germany"), ("BE", "Belgium"), ("FR", "France"), ("CN", "China")]:
-        s19 = p19.loc[c_code, "market_share_pct"] if c_code in p19.index else 0.0
-        s20 = p20.loc[c_code, "market_share_pct"] if c_code in p20.index else 0.0
-        covid_shifts.append({
-            "country": c_name,
-            "pre": f"{s19:.1f}%",
-            "post": f"{s20:.1f}%",
-            "delta": f"{(s20 - s19):+.1f} pp"
-        })
 
-    tot_m = sea_df[(sea_df["product_code"] == "TOTAL") & (sea_df["flow"] == "IMPORT")]
-    if not tot_m.empty:
-        v19 = tot_m[(tot_m["year"] == 2019) & (tot_m["month"].between(3, 7))]["value_eur"].sum()
-        v20 = tot_m[(tot_m["year"] == 2020) & (tot_m["month"].between(3, 7))]["value_eur"].sum()
-        cov_drop = ((v20 / v19) - 1.0) * 100 if v19 > 0 else -20.8
 
-        m19_apr = tot_m[(tot_m["year"] == 2019) & (tot_m["month"] == 4)]["value_eur"].iloc[0]
-        m20_apr = tot_m[(tot_m["year"] == 2020) & (tot_m["month"] == 4)]["value_eur"].iloc[0]
-        apr_drop = ((m20_apr / m19_apr) - 1.0) * 100 if m19_apr > 0 else -41.5
-    else:
-        cov_drop, apr_drop = -20.8, -41.5
+def render_tab_stress(selected_year=None):
+    return render_tab_resilience(selected_year)
 
-    hhi_19 = (p19["market_share_pct"] ** 2).sum() if not p19.empty else 0.0
-    hhi_20 = (p20["market_share_pct"] ** 2).sum() if not p20.empty else 0.0
-    cov_hhi_shift = hhi_20 - hhi_19
-
-    # 2. Energy Shock (2021 vs 2022)
-    p21 = part_df[(part_df["year"] == 2021) & (part_df["flow"] == "IMPORT")].set_index("partner_code")
-    p22 = part_df[(part_df["year"] == 2022) & (part_df["flow"] == "IMPORT")].set_index("partner_code")
-
-    gas_shifts = []
-    for c_code, c_name in [("NL", "Netherlands"), ("BE", "Belgium"), ("NO", "Norway"), ("RU", "Russia")]:
-        s21 = p21.loc[c_code, "market_share_pct"] if c_code in p21.index else 0.0
-        s22 = p22.loc[c_code, "market_share_pct"] if c_code in p22.index else 0.0
-        gas_shifts.append({
-            "country": c_name,
-            "pre": f"{s21:.1f}%",
-            "post": f"{s22:.1f}%",
-            "delta": f"{(s22 - s21):+.1f} pp"
-        })
-
-    val_21 = p21["value_eur"].sum() if not p21.empty else 1.0
-    val_22 = p22["value_eur"].sum() if not p22.empty else 1.0
-    gas_val_change = ((val_22 / val_21) - 1.0) * 100
-
-    hhi_21 = (p21["market_share_pct"] ** 2).sum() if not p21.empty else 0.0
-    hhi_22 = (p22["market_share_pct"] ** 2).sum() if not p22.empty else 0.0
-    gas_hhi_shift = hhi_22 - hhi_21
-
-    # 3. Model Simulation (Maritime Transit Disruption)
-    base_yr = part_df["year"].max()
-    p_base = part_df[(part_df["year"] == base_yr) & (part_df["flow"] == "IMPORT")].set_index("partner_code")
-    maritime_shifts = []
-    for c_code, c_name, factor in [("BE", "Belgium", -0.09), ("US", "United States", +1.3), ("NO", "Norway", +1.1), ("AE", "United Arab Emirates", -1.0)]:
-        s_base = p_base.loc[c_code, "market_share_pct"] if c_code in p_base.index else 1.5
-        s_sim = max(0.0, s_base * (1.0 + factor))
-        maritime_shifts.append({
-            "country": c_name,
-            "pre": f"{s_base:.1f}%",
-            "post": f"{s_sim:.1f}%",
-            "delta": f"{(s_sim - s_base):+.1f} pp"
-        })
-
-    sim_drop_pct = -11.5
-    sim_hhi_shift = 1120
-
-    scenarios_meta = {
-        "covid": {
-            "title": "COVID-19 Disruption Period (March 2020 – July 2020)",
-            "drop": f"{cov_drop:+.1f}%",
-            "hhi_shift": f"{cov_hhi_shift:+.0f} pts",
-            "weakest": f"April 2020 ({apr_drop:+.1f}% YoY)",
-            "desc": "Observed variation in monthly trade flows during the initial months of the COVID-19 pandemic.",
-            "shifts": covid_shifts
-        },
-        "gas": {
-            "title": "Energy Market Shock (February 2022 – December 2022)",
-            "drop": f"{gas_val_change:+.1f}% (Value)",
-            "hhi_shift": f"{gas_hhi_shift:+.0f} pts",
-            "weakest": "August 2022",
-            "desc": "Observed variation in trade values following wholesale energy price movements in 2022.",
-            "shifts": gas_shifts
-        },
-        "hormuz": {
-            "title": "Simulated Maritime Transit Scenario (Model Projection)",
-            "drop": f"{sim_drop_pct:+.1f}% (Projected)",
-            "hhi_shift": f"{sim_hhi_shift:+.0f} pts",
-            "weakest": "Month 2 (Simulated)",
-            "desc": "Model projection simulating a contraction in global maritime liquid fuel transit.",
-            "shifts": maritime_shifts
-        }
-    }
-
-    meta = scenarios_meta.get(scenario, scenarios_meta["gas"])
-
-    kpi_cards = dbc.Row([
-        dbc.Col([
-            html.Div([
-                html.Span("TOTAL TRADE VARIATION", className="kpi-label"),
-                html.H4(meta["drop"], className="kpi-val kpi-val-danger"),
-                html.Small("Observed 4-month post-shock change", className="kpi-caption")
-            ], className="compact-kpi-tile")
-        ], md=4, sm=6, className="mb-2"),
-
-        dbc.Col([
-            html.Div([
-                html.Span("CONCENTRATION (HHI) SHIFT", className="kpi-label"),
-                html.H4(meta["hhi_shift"], className="kpi-val kpi-val-warning"),
-                html.Small("Change in supplier concentration (HHI)", className="kpi-caption")
-            ], className="compact-kpi-tile")
-        ], md=4, sm=6, className="mb-2"),
-
-        dbc.Col([
-            html.Div([
-                html.Span("PEAK OBSERVED IMPACT", className="kpi-label"),
-                html.H5(meta["weakest"], className="kpi-val kpi-val-navy"),
-                html.Small("Lowest monthly point during period", className="kpi-caption")
-            ], className="compact-kpi-tile")
-        ], md=4, sm=12, className="mb-2"),
-    ], className="mb-3")
-
-    # Shift table
-    table_rows = [
-        html.Tr([
-            html.Td(html.Strong(s["country"])),
-            html.Td(s["pre"], className="text-muted-custom"),
-            html.Td(s["post"], className="fw-semibold"),
-            html.Td(html.Span(s["delta"], className="badge " + ("bg-success" if s["delta"].startswith("+") else "bg-danger")))
-        ])
-        for s in meta["shifts"]
-    ]
-
-    table_card = html.Div([
-        html.H6("PARTNER IMPORT SHARE VARIATIONS", className="card-title-upper"),
-        html.Table([
-            html.Thead(html.Tr([
-                html.Th("Partner Country"), html.Th("Pre-Period Share"), html.Th("Post-Period Share"), html.Th("Net Variation (Δ)")
-            ])),
-            html.Tbody(table_rows)
-        ], className="table table-hover mb-0")
-    ], className="dash-card")
-
-    info_card = html.Div([
-        html.H6(meta["title"].upper(), className="card-title-upper"),
-        html.P(meta["desc"], className="text-muted-custom mb-0 small"),
-    ], className="notice-card")
-
-    return html.Div([
-        info_card,
-        kpi_cards,
-        table_card
-    ])
 
 
 # ───────────────────────────────────────────────────────────────────────────

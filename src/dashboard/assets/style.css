@@ -853,3 +853,14 @@ table.table tbody tr:last-child td {
     background-color: #DCFCE7;
     color: #065F46;
 }
+
+/* Spider Web / Radar Chart Utility */
+.chart-h-350 {
+    height: 350px;
+}
+
+.radar-subtitle {
+    font-size: 12px;
+    color: var(--statec-gray);
+    margin-top: 2px;
+}
