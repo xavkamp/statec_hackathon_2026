@@ -1,7 +1,7 @@
-"""Interactive Dash Application for STATEC Hackathon 2026.
-Luxembourg External Trade Intelligence (2000-2026).
-Eurostat Dataset: ds-045409
-Pure Tabular CSV Pipeline.
+# -*- coding: utf-8 -*-
+"""STATEC Hackathon 2026 — Luxembourg External Trade Intelligence (2000–2026).
+Dataset: Eurostat ds-045409 (EU trade since 1988 by HS2-4-6 and CN8).
+Pure Tabular CSV Architecture.
 """
 
 import sys
@@ -22,12 +22,12 @@ if str(BASE_DIR) not in sys.path:
 from src.dashboard.design_system import (
     PRIMARY, SECONDARY, SUCCESS, DANGER, WARNING, NEUTRAL,
     SURFACE, BACKGROUND, BORDER, TEXT_PRIMARY, TEXT_MUTED,
-    CATEGORICAL, PLOT_LAYOUT, CARD_STYLE, KPI_CARD_STYLE, apply_plot_theme,
+    CATEGORICAL, CARD_STYLE, KPI_CARD_STYLE, apply_plot_theme,
     apply_map_theme, create_icon_badge,
     add_iso3_column, ISO2_TO_ISO3, STATEC_NAVY, STATEC_YELLOW, STATEC_BLUE,
-    STATEC_RED, STATEC_GRAY, STATEC_BG, STATEC_HEADING_STYLE,
-    create_section_header, create_statec_footer, create_infobox,
-    create_info_hover, INFO_HOVER_CSS
+    STATEC_RED, STATEC_GRAY, STATEC_BG,
+    create_section_header, create_dashboard_footer, create_infobox,
+    create_info_hover, INFO_HOVER_CSS, fmt_eur, fmt_pct, get_concentration_badge
 )
 from src.dashboard.data_loader import (
     load_overview_kpis, load_partner_rankings, load_product_rankings,
@@ -35,8 +35,24 @@ from src.dashboard.data_loader import (
     load_country_benchmarks, load_drilldown_lvl2, load_drilldown_lvl4, load_drilldown_lvl8
 )
 
+ISO2_NAMES_EN = {
+    "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands",
+    "US": "United States", "IT": "Italy", "GB": "United Kingdom", "ES": "Spain",
+    "CN": "China", "CH": "Switzerland", "PL": "Poland", "AT": "Austria",
+    "SE": "Sweden", "JP": "Japan", "CZ": "Czechia", "DK": "Denmark",
+    "IE": "Ireland", "PT": "Portugal", "TR": "Turkey", "IN": "India",
+    "BR": "Brazil", "KR": "South Korea", "NO": "Norway", "RU": "Russia",
+    "CA": "Canada", "MX": "Mexico", "AU": "Australia", "ZA": "South Africa",
+    "HU": "Hungary", "RO": "Romania", "SG": "Singapore", "LU": "Luxembourg",
+    "FI": "Finland", "SK": "Slovakia", "GR": "Greece", "BG": "Bulgaria",
+    "HR": "Croatia", "SI": "Slovenia", "LT": "Lithuania", "LV": "Latvia",
+    "EE": "Estonia", "CY": "Cyprus", "MT": "Malta"
+}
 
-# Initialize Dash App
+def get_country_name(code: str) -> str:
+    c = str(code).upper().strip()
+    return ISO2_NAMES_EN.get(c, c)
+
 app = dash.Dash(
     __name__,
     external_stylesheets=[
@@ -44,7 +60,7 @@ app = dash.Dash(
         "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css",
         "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@500;600;700;800;900&display=swap"
     ],
-    title="Luxembourg Trade Intelligence (Prototype d'Analyse) — Données Ouvertes",
+    title="Luxembourg Trade Intelligence (Resilience Radar) — STATEC Hackathon 2026",
     suppress_callback_exceptions=True
 )
 app.index_string = f"""<!DOCTYPE html>
@@ -56,6 +72,64 @@ app.index_string = f"""<!DOCTYPE html>
         {{%css%}}
         <style>
 {INFO_HOVER_CSS}
+        body {{
+            background-color: {BACKGROUND};
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: {TEXT_PRIMARY};
+        }}
+        .nav-box-card {{
+            background-color: #FFFFFF;
+            border-radius: 10px;
+            border: 1px solid {BORDER};
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0, 26, 56, 0.04);
+        }}
+        .nav-tab-btn {{
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Montserrat', sans-serif;
+            padding: 7px 13px;
+            margin: 3px 4px;
+            transition: all 0.15s ease-in-out;
+            border: 1px solid {BORDER};
+            background-color: #FFFFFF;
+            color: {STATEC_NAVY};
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+            user-select: none;
+        }}
+        .nav-tab-btn:hover {{
+            background-color: #F8FAFC;
+            border-color: #94A3B8;
+            color: {STATEC_BLUE};
+        }}
+        .nav-tab-btn.active {{
+            background-color: {STATEC_NAVY} !important;
+            color: #FFFFFF !important;
+            border-color: {STATEC_NAVY} !important;
+            border-bottom: 3px solid {STATEC_YELLOW} !important;
+            box-shadow: 0 2px 8px rgba(0, 26, 56, 0.25);
+        }}
+        .compact-kpi-tile {{
+            background-color: #FFFFFF;
+            border: 1px solid {BORDER};
+            border-radius: 8px;
+            padding: 8px 12px;
+            box-shadow: 0 1px 3px rgba(0, 26, 56, 0.03);
+            height: 100%;
+        }}
+        .spotlight-card {{
+            background-color: #FFFFFF;
+            border: 1px solid {BORDER};
+            border-left: 4px solid {STATEC_YELLOW};
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 6px rgba(0, 26, 56, 0.04);
+        }}
         </style>
     </head>
     <body>
@@ -70,115 +144,41 @@ app.index_string = f"""<!DOCTYPE html>
 server = app.server
 
 
-
-# ── Helper formatters ────────────────────────────────────────────────────────
-def fmt_eur(val: float) -> str:
-    """Format euro value in Millions or Billions."""
-    if pd.isna(val) or val is None:
-        return "—"
-    abs_v = abs(val)
-    sign = "-" if val < 0 else ""
-    if abs_v >= 1e9:
-        return f"{sign}€{abs_v/1e9:.2f}B"
-    elif abs_v >= 1e6:
-        return f"{sign}€{abs_v/1e6:.1f}M"
-    else:
-        return f"{sign}€{abs_v:,.0f}"
-
-
-def get_concentration_badge(hhi: float):
-    """Return colored badge for Herfindahl-Hirschman Index concentration."""
-    if pd.isna(hhi):
-        return html.Span("N/A", className="badge bg-secondary")
-    if hhi >= 2500:
-        return html.Span(f"HHI {hhi:.0f} • High Concentration", style={
-            "backgroundColor": "#FEE2E2", "color": "#B91C1C", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCA5A5"
-        })
-    elif hhi >= 1500:
-        return html.Span(f"HHI {hhi:.0f} • Moderate Concentration", style={
-            "backgroundColor": "#FEF3C7", "color": "#B45309", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCD34D"
-        })
-    else:
-        return html.Span(f"HHI {hhi:.0f} • Diversified", style={
-            "backgroundColor": "#D1FAE5", "color": "#047857", "padding": "4px 10px",
-            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #6EE7B7"
-        })
-
-
-# ── Header & KPI Ribbon Layout ──────────────────────────────────────────────
+# ── Header ─────────────────────────────────────────────────────────────────
 def create_header():
     return html.Div([
-        # Top White Brand Bar (Luxembourg Trade Intelligence Prototype)
         html.Div([
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
                         html.Div([
-                            # TRADE.lu Logo with professional globe icon badge
+                            create_icon_badge("bi bi-shield-check", color=STATEC_NAVY, bg="#FFF9E6", size=20, box_size=40),
                             html.Div([
-                                create_icon_badge("bi bi-globe-americas", color=STATEC_NAVY, bg="#F0F4F8", size=20, box_size=42),
                                 html.Div([
-                                    html.Div([
-                                        html.Span("TRADE", style={
-                                            "fontSize": "25px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
-                                            "color": STATEC_NAVY, "letterSpacing": "-0.5px"
-                                        }),
-                                        html.Span(".lu", style={
-                                            "fontSize": "25px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
-                                            "color": STATEC_YELLOW
-                                        }),
-                                    ]),
-                                    html.Span("LUXEMBOURG TRADE INTELLIGENCE", style={
-                                        "fontSize": "8.5px", "fontWeight": "800", "letterSpacing": "1.3px",
-                                        "color": STATEC_GRAY, "display": "block", "marginTop": "-4px"
-                                    }),
-                                ], className="ms-2")
-                            ], className="d-flex align-items-center", style={"minWidth": "250px"}),
-
-                            # Vertical Divider
-                            html.Div(style={"width": "1px", "height": "34px", "backgroundColor": "#CBD5E1", "margin": "0 22px"}, className="d-none d-lg-block"),
-
-                            # Section Title
+                                    html.Span("TRADE", style={"fontSize": "22px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY}),
+                                    html.Span(".lu", style={"fontSize": "22px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_YELLOW}),
+                                ]),
+                                html.Span("TRADE OBSERVATORY", style={"fontSize": "9px", "fontWeight": "800", "letterSpacing": "1.2px", "color": STATEC_GRAY, "display": "block", "marginTop": "-4px"}),
+                            ], className="ms-2"),
+                            html.Div(style={"width": "1px", "height": "32px", "backgroundColor": "#CBD5E1", "margin": "0 18px"}, className="d-none d-lg-block"),
                             html.Div([
-                                html.Span("COMMERCE EXTÉRIEUR DU LUXEMBOURG", style={
-                                    "fontSize": "16px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif",
-                                    "color": STATEC_NAVY, "letterSpacing": "0.3px", "display": "block"
-                                }),
-                                html.Span("OBSERVATOIRE MACROÉCONOMIQUE & RÉSILIENCE SOUVERAINE (2000–2026)", style={
-                                    "fontSize": "11px", "fontWeight": "600", "color": STATEC_GRAY, "display": "block"
-                                }),
+                                html.Span("LUXEMBOURG EXTERNAL TRADE INTELLIGENCE", style={"fontSize": "15px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "display": "block"}),
+                                html.Span("Eurostat Comext Open Data [ds-045409] (2000–2026)", style={"fontSize": "11px", "fontWeight": "500", "color": STATEC_GRAY, "display": "block"}),
                             ], className="d-none d-lg-block"),
                         ], className="d-flex align-items-center py-2")
                     ], md=8),
 
                     dbc.Col([
                         html.Div([
-                            # Research Project Badge
-                            html.Div([
-                                html.Span("PROJET HACKATHON 2026", style={
-                                    "fontSize": "10px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif",
-                                    "color": STATEC_NAVY, "display": "block"
-                                }),
-                                html.Span("PROTOTYPE NON OFFICIEL", style={
-                                    "fontSize": "9px", "fontWeight": "700", "color": STATEC_GRAY, "display": "block"
-                                }),
-                            ], className="text-end me-4 d-none d-md-block"),
-
-                            # Year Selector
                             html.Div([
                                 html.Label([
                                     html.I(className="bi bi-calendar3 me-1", style={"color": STATEC_BLUE}),
-                                    "ANNÉE D'ANALYSE"
-                                ], style={
-                                    "fontSize": "10px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif",
-                                    "color": STATEC_NAVY, "letterSpacing": "0.5px", "marginBottom": "2px"
-                                }),
+                                    "ANALYSIS YEAR"
+                                ], style={"fontSize": "10px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.5px", "marginBottom": "2px"}),
                                 dcc.Dropdown(
                                     id="global-year-dropdown",
                                     options=[{"label": str(y), "value": y} for y in range(2025, 1999, -1)],
-                                    value=2024,
+                                    value=2025,
                                     clearable=False,
                                     style={"fontSize": "13px", "fontWeight": "700", "borderRadius": "6px", "minWidth": "105px"}
                                 )
@@ -189,1646 +189,266 @@ def create_header():
             ], fluid=True, style={"maxWidth": "1540px"})
         ], style={"backgroundColor": "#FFFFFF", "borderBottom": "1px solid #E2E8F0"}),
 
-        # Second Midnight Navy Banner Bar
         html.Div([
             dbc.Container([
-                dbc.Row([
-                    dbc.Col([
-                        html.Div([
-                            html.Span("PROTOTYPE ANALYTIQUE", style={
-                                "backgroundColor": STATEC_YELLOW, "color": STATEC_NAVY,
-                                "fontWeight": "800", "fontSize": "10px", "padding": "2px 8px",
-                                "borderRadius": "4px", "marginRight": "12px", "letterSpacing": "0.5px",
-                                "fontFamily": "'Montserrat', sans-serif"
-                            }),
-                            html.Span("Basé sur les données ouvertes Eurostat Comext [ds-045409] & STATEC (2000–2026)", style={
-                                "color": "#F8FAFC", "fontSize": "12px", "fontWeight": "500"
-                            }),
-                        ], className="d-flex align-items-center")
-                    ], md=8),
-                    dbc.Col([
-                        html.Div([
-                            html.Span("PROTOTYPE HACKATHON 2026 — NON AFFILIÉ OFFICIELLEMENT AU STATEC", style={
-                                "color": "#94A3B8", "fontSize": "10.5px", "fontWeight": "600", "letterSpacing": "0.3px",
-                                "fontFamily": "'Montserrat', sans-serif"
-                            }),
-                        ], className="d-flex justify-content-end align-items-center")
-                    ], md=4, className="d-none d-md-flex")
-                ], className="align-items-center")
+                html.Div([
+                    html.Span("STATEC HACKATHON 2026", style={"backgroundColor": STATEC_YELLOW, "color": STATEC_NAVY, "fontWeight": "800", "fontSize": "9.5px", "padding": "2px 7px", "borderRadius": "4px", "marginRight": "10px", "fontFamily": "'Montserrat', sans-serif"}),
+                    html.Span("Interactive merchandise trade analytics and tariff line decomposition (HS2–CN8).", style={"color": "#E2E8F0", "fontSize": "11px", "fontWeight": "500"}),
+                ], className="d-flex align-items-center")
             ], fluid=True, style={"maxWidth": "1540px"})
-        ], style={
-            "backgroundColor": STATEC_NAVY, "padding": "7px 0",
-            "marginBottom": "24px", "borderBottom": f"3px solid {STATEC_YELLOW}",
-            "boxShadow": "0 2px 8px rgba(0, 26, 56, 0.15)"
-        })
+        ], style={"backgroundColor": STATEC_NAVY, "padding": "5px 0", "marginBottom": "16px", "borderBottom": f"2.5px solid {STATEC_YELLOW}"})
     ])
 
 
-def create_kpi_ribbon():
-    return html.Div(id="kpi-ribbon-container", className="mb-4")
+# ── Compact Key Figures Ribbon in Leadership View ─────────────────
+def create_compact_kpi_ribbon(year: int):
+    df = load_overview_kpis()
+    if df.empty:
+        return html.Div()
+
+    row = df[df["year"] == year]
+    if row.empty:
+        row = df[df["year"] == df["year"].max()]
+
+    r = row.iloc[0]
+    exp_val = r.get("EXPORT", 0.0)
+    imp_val = r.get("IMPORT", 0.0)
+    bal_val = r.get("trade_balance_eur", exp_val - imp_val)
+    cov_val = r.get("coverage_ratio_pct", (exp_val / imp_val * 100) if imp_val > 0 else 0)
+    eu_imp = r.get("intra_eu_import_share_pct", 84.5)
+
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.Span("IMPORTS (GOODS)", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED, "letterSpacing": "0.4px"}),
+                    html.H5(fmt_eur(imp_val), style={"fontWeight": "800", "color": STATEC_NAVY, "margin": "1px 0"}),
+                    html.Small("Annual merchandise imports", style={"fontSize": "10px", "color": TEXT_MUTED})
+                ], className="compact-kpi-tile")
+            ], md=2, sm=6, className="mb-2"),
+
+            dbc.Col([
+                html.Div([
+                    html.Span("EXPORTS (GOODS)", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED, "letterSpacing": "0.4px"}),
+                    html.H5(fmt_eur(exp_val), style={"fontWeight": "800", "color": STATEC_BLUE, "margin": "1px 0"}),
+                    html.Small("Annual merchandise exports", style={"fontSize": "10px", "color": TEXT_MUTED})
+                ], className="compact-kpi-tile")
+            ], md=2, sm=6, className="mb-2"),
+
+            dbc.Col([
+                html.Div([
+                    html.Span("MERCHANDISE BALANCE", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED, "letterSpacing": "0.4px"}),
+                    html.H5(fmt_eur(bal_val), style={"fontWeight": "800", "color": DANGER if bal_val < 0 else SUCCESS, "margin": "1px 0"}),
+                    html.Small("Exports minus Imports", style={"fontSize": "10px", "color": TEXT_MUTED})
+                ], className="compact-kpi-tile")
+            ], md=3, sm=6, className="mb-2"),
+
+            dbc.Col([
+                html.Div([
+                    html.Span("COVERAGE RATIO", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED, "letterSpacing": "0.4px"}),
+                    html.H5(f"{cov_val:.1f}%", style={"fontWeight": "800", "color": STATEC_NAVY, "margin": "1px 0"}),
+                    html.Small("Exports / Imports ratio", style={"fontSize": "10px", "color": TEXT_MUTED})
+                ], className="compact-kpi-tile")
+            ], md=3, sm=6, className="mb-2"),
+
+            dbc.Col([
+                html.Div([
+                    html.Span("INTRA-EU IMPORTS", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED, "letterSpacing": "0.4px"}),
+                    html.H5(f"{eu_imp:.1f}%", style={"fontWeight": "800", "color": STATEC_BLUE, "margin": "1px 0"}),
+                    html.Small("Share of total merchandise imports", style={"fontSize": "10px", "color": TEXT_MUTED})
+                ], className="compact-kpi-tile")
+            ], md=2, sm=6, className="mb-2"),
+        ], className="g-2")
+    ], className="mb-3")
 
 
-# ── Audience Mode Selector ──────────────────────────────────────────────────
-def create_audience_mode_selector():
-    return dbc.Row([
-        dbc.Col([
+# ── The 10 Buttons in 2 Organizing Boxes ───────────────────────────────────
+def create_navigation_boxes():
+    return html.Div([
+        # Box 1: Macro & Strategic Baskets (4 Buttons)
+        html.Div([
             html.Div([
-                dbc.Row([
-                    dbc.Col([
-                        html.Div([
-                            html.Div([
-                                create_icon_badge("bi bi-bank2", color=STATEC_NAVY, bg="#FFF9E6", size=22, box_size=46),
-                                html.Div([
-                                    html.Div([
-                                        html.Strong("NATIONAL LEADERSHIP BRIEFING", style={"fontSize": "14px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
-                                        html.Span("EXECUTIVE • PRIORITY OVERVIEW", style={"backgroundColor": STATEC_NAVY, "color": STATEC_YELLOW, "fontSize": "10px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "padding": "2px 8px", "borderRadius": "4px", "marginLeft": "10px"})
-                                    ], className="d-flex align-items-center"),
-                                    html.P(
-                                        "Answers Pressing Questions First: Sovereign economic resilience, critical supply chain bottlenecks, and macro health.",
-                                        className="text-muted mb-0", style={"fontSize": "12px", "marginTop": "2px"}
-                                    )
-                                ], className="ms-3")
-                            ], className="d-flex align-items-center"),
-                        ], id="btn-mode-leaders", n_clicks=0, style={
-                            "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-                            "border": f"2px solid {STATEC_YELLOW}", "backgroundColor": "#FFFFFF",
-                            "transition": "all 0.2s ease-in-out", "boxShadow": "0 4px 14px rgba(255, 200, 0, 0.28)"
-                        })
-                    ], md=6, className="mb-2 mb-md-0"),
+                create_icon_badge("bi bi-bank2", color=STATEC_NAVY, bg="#FFF9E6", size=15, box_size=28),
+                html.Span("1. MACRO & BASKET OVERVIEW", style={
+                    "fontSize": "11.5px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif",
+                    "color": STATEC_NAVY, "letterSpacing": "0.6px", "marginLeft": "8px"
+                }),
+                html.Span("HIGH-LEVEL VIEWS", style={
+                    "backgroundColor": STATEC_NAVY, "color": STATEC_YELLOW, "fontSize": "9px",
+                    "fontWeight": "800", "padding": "2px 6px", "borderRadius": "3px", "marginLeft": "8px"
+                })
+            ], className="d-flex align-items-center mb-2"),
 
-                    dbc.Col([
-                        html.Div([
-                            html.Div([
-                                create_icon_badge("bi bi-graph-up-arrow", color=STATEC_BLUE, bg="#EFF6FF", size=22, box_size=46),
-                                html.Div([
-                                    html.Div([
-                                        html.Strong("DATA ANALYST DEEP-DIVE SUITE", style={"fontSize": "14px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
-                                        html.Span("ADVANCED DRILL-DOWN", style={"backgroundColor": "#F1F5F9", "color": STATEC_GRAY, "fontSize": "10px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "padding": "2px 8px", "borderRadius": "4px", "marginLeft": "10px"})
-                                    ], className="d-flex align-items-center"),
-                                    html.P(
-                                        "Explore Details Afterwards: Granular tariff lines (HS2→CN8), full world maps, seasonal modeling & peer benchmarks.",
-                                        className="text-muted mb-0", style={"fontSize": "12px", "marginTop": "2px"}
-                                    )
-                                ], className="ms-3")
-                            ], className="d-flex align-items-center"),
-                        ], id="btn-mode-analysts", n_clicks=0, style={
-                            "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-                            "border": f"1px solid {BORDER}", "backgroundColor": SURFACE,
-                            "transition": "all 0.2s ease-in-out"
-                        })
-                    ], md=6),
-                ])
-            ], style=CARD_STYLE, className="py-3 px-3 mb-3")
-        ], md=12)
+            html.Div([
+                html.Button([
+                    html.I(className="bi bi-shield-check me-1 text-warning"),
+                    "1. Product Baskets & Concentration"
+                ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-graph-up me-1 text-primary"),
+                    "2. Macro Trajectory & Balances"
+                ], id="btn-tab-macro", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-globe-europe-africa me-1 text-info"),
+                    "3. Geopolitical & Seasonal Flows"
+                ], id="btn-tab-geopolitics", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-lightning-charge me-1 text-danger"),
+                    "4. Historical Shock Scenarios"
+                ], id="btn-tab-stress", className="nav-tab-btn", n_clicks=0),
+            ], className="d-flex flex-wrap")
+        ], className="nav-box-card", style={"borderLeft": f"4px solid {STATEC_YELLOW}"}),
+
+        # Box 2: Data Analyst Deep-Dive Suite (6 Buttons: Q1–Q6)
+        html.Div([
+            html.Div([
+                create_icon_badge("bi bi-diagram-3", color=STATEC_BLUE, bg="#EFF6FF", size=15, box_size=28),
+                html.Span("2. DATA ANALYST DEEP-DIVE SUITE (RESEARCH QUESTIONS Q1–Q6)", style={
+                    "fontSize": "11.5px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif",
+                    "color": STATEC_NAVY, "letterSpacing": "0.6px", "marginLeft": "8px"
+                }),
+                html.Span("GRANULAR TARIFF & TIME-SERIES", style={
+                    "backgroundColor": "#EFF6FF", "color": STATEC_BLUE, "fontSize": "9px",
+                    "fontWeight": "800", "padding": "2px 6px", "borderRadius": "3px", "marginLeft": "8px",
+                    "border": "1px solid #BFDBFE"
+                })
+            ], className="d-flex align-items-center mb-2"),
+
+            html.Div([
+                html.Button([
+                    html.I(className="bi bi-geo-alt me-1"),
+                    "Q1: Trading Partners"
+                ], id="btn-tab-partners", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-boxes me-1"),
+                    "Q2: Product Categories"
+                ], id="btn-tab-products", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-funnel me-1"),
+                    "Q3: Product Principal Partners"
+                ], id="btn-tab-q3-partners", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-list-nested me-1"),
+                    "Q4: Tariff Lines (HS2→CN8)"
+                ], id="btn-tab-q4-drilldown", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-bar-chart-steps me-1"),
+                    "Q5: Peer Benchmarking"
+                ], id="btn-tab-benchmarks", className="nav-tab-btn", n_clicks=0),
+
+                html.Button([
+                    html.I(className="bi bi-calendar-range me-1"),
+                    "Q6: Seasonality Lab"
+                ], id="btn-tab-seasonality", className="nav-tab-btn", n_clicks=0),
+            ], className="d-flex flex-wrap")
+        ], className="nav-box-card", style={"borderLeft": f"4px solid {STATEC_BLUE}"})
     ])
 
 
 # ── App Main Layout ─────────────────────────────────────────────────────────
 app.layout = html.Div([
-    dcc.Store(id="current-audience-mode", data="leaders"),
     dcc.Store(id="active-tab-store", data="tab-resilience"),
     create_header(),
     dbc.Container([
-        create_kpi_ribbon(),
-        create_audience_mode_selector(),
-
-        # Dynamic Sub-tabs container based on audience
-        html.Div(id="sub-tabs-container", className="mb-4"),
-
+        create_navigation_boxes(),
         # Tab Content Container
         html.Div(id="tab-content", style={"minHeight": "650px"})
     ], fluid=True, style={"maxWidth": "1540px", "paddingBottom": "30px"}),
-    create_statec_footer()
-], style={"backgroundColor": BACKGROUND, "minHeight": "100vh", "fontFamily": "'Inter', -apple-system, sans-serif"})
+    create_dashboard_footer()
+])
 
 
-# ── KPI Ribbon Callback ────────────────────────────────────────────────────
+# ── Active Tab Navigation Router ───────────────────────────────────────────
+ALL_TAB_BTNS = [
+    "btn-tab-resilience", "btn-tab-macro", "btn-tab-geopolitics", "btn-tab-stress",
+    "btn-tab-partners", "btn-tab-products", "btn-tab-q3-partners",
+    "btn-tab-q4-drilldown", "btn-tab-benchmarks", "btn-tab-seasonality"
+]
+TAB_ID_MAP = {
+    "btn-tab-resilience": "tab-resilience",
+    "btn-tab-macro": "tab-macro",
+    "btn-tab-geopolitics": "tab-geopolitics",
+    "btn-tab-stress": "tab-stress",
+    "btn-tab-partners": "tab-partners",
+    "btn-tab-products": "tab-products",
+    "btn-tab-q3-partners": "tab-q3-partners",
+    "btn-tab-q4-drilldown": "tab-q4-drilldown",
+    "btn-tab-benchmarks": "tab-benchmarks",
+    "btn-tab-seasonality": "tab-seasonality"
+}
+
 @callback(
-    Output("kpi-ribbon-container", "children"),
-    Input("global-year-dropdown", "value")
+    Output("active-tab-store", "data"),
+    [Output(b_id, "className") for b_id in ALL_TAB_BTNS],
+    [Input(b_id, "n_clicks") for b_id in ALL_TAB_BTNS],
+    State("active-tab-store", "data"),
+    prevent_initial_call=False
 )
-def update_kpis(selected_year):
-    kpis_df = load_overview_kpis()
-    if kpis_df.empty:
-        return html.Div()
+def switch_active_nav_tab(*args):
+    current_tab = args[-1] or "tab-resilience"
+    try:
+        ctx = dash.callback_context
+        if ctx and ctx.triggered:
+            trig_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if trig_id in TAB_ID_MAP:
+                current_tab = TAB_ID_MAP[trig_id]
+    except Exception:
+        pass
 
-    row = kpis_df[kpis_df["year"] == selected_year]
-    if row.empty:
-        row = kpis_df.iloc[-1]
-    else:
-        row = row.iloc[0]
-
-    exp_val = row.get("EXPORT", 0)
-    imp_val = row.get("IMPORT", 0)
-    bal_val = row.get("trade_balance_eur", 0)
-    cov_val = row.get("coverage_ratio_pct", 0)
-    intra_eu_exp = row.get("intra_eu_export_share_pct", np.nan)
-    intra_eu_imp = row.get("intra_eu_import_share_pct", np.nan)
-
-    exp_yoy = row.get("export_yoy_growth_pct", 0)
-    imp_yoy = row.get("import_yoy_growth_pct", 0)
-
-    def render_badge(val, is_pct=True):
-        if pd.isna(val):
-            return ""
-        color = SUCCESS if val >= 0 else DANGER
-        icon = "▲" if val >= 0 else "▼"
-        suffix = "%" if is_pct else ""
-        return html.Span(
-            f"{icon} {abs(val):.1f}{suffix} YoY",
-            style={"color": color, "fontSize": "12px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "marginLeft": "8px"}
-        )
-
-    return html.Div([
-        # "CHIFFRES CLÉS" Section Title with interactive hover infobox
-        html.Div([
-            html.Div([
-                html.H5(f"CHIFFRES CLÉS DU COMMERCE EXTÉRIEUR ({selected_year})", style=STATEC_HEADING_STYLE, className="mb-0 d-inline-block"),
-                create_info_hover(
-                    "Comprendre les Chiffres Clés : Déficit des Biens & Rôle des Services",
-                    [
-                        html.Span("Le solde physique déficitaire des marchandises ("),
-                        html.Strong(fmt_eur(bal_val)),
-                        html.Span(f", taux de couverture de {cov_val:.1f}%) est une caractéristique structurelle du Luxembourg : les biens importés (énergie, véhicules, denrées alimentaires) sont intégralement financés par l'excédent massif des services financiers et de fonds d'investissement (+25 Mrd €), assurant un compte courant souverain très excédentaire."),
-                    ],
-                    icon="ⓘ",
-                    variant="navy"
-                )
-            ], className="d-flex align-items-center mb-1"),
-            html.Div(style={"width": "42px", "height": "4px", "backgroundColor": STATEC_YELLOW, "borderRadius": "2px", "marginBottom": "16px"}),
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-box-arrow-up-right", color=PRIMARY, bg="#EBF5FF", size=15, box_size=32),
-                        html.Span("EXPORTATIONS TOTALES", style={"fontSize": "11px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_GRAY, "letterSpacing": "0.8px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-1"),
-                    html.Div([
-                        html.H2(fmt_eur(exp_val), style={"fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": PRIMARY, "margin": "2px 0 0 0"}),
-                        render_badge(exp_yoy)
-                    ], className="d-flex align-items-baseline"),
-                    html.Small(f"Part intra-UE : {intra_eu_exp:.1f}% des biens exportés" if not pd.isna(intra_eu_exp) else "Exportations physiques", className="text-muted", style={"fontSize": "11px"})
-                ], style={**KPI_CARD_STYLE, "borderTop": f"4px solid {PRIMARY}"})
-            ], md=3, sm=6, className="mb-3"),
-
-            dbc.Col([
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-box-arrow-in-down-left", color=SECONDARY, bg="#F1F5F9", size=15, box_size=32),
-                        html.Span("IMPORTATIONS TOTALES", style={"fontSize": "11px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_GRAY, "letterSpacing": "0.8px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-1"),
-                    html.Div([
-                        html.H2(fmt_eur(imp_val), style={"fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": SECONDARY, "margin": "2px 0 0 0"}),
-                        render_badge(imp_yoy)
-                    ], className="d-flex align-items-baseline"),
-                    html.Small(f"Part intra-UE : {intra_eu_imp:.1f}% des biens importés" if not pd.isna(intra_eu_imp) else "Importations physiques", className="text-muted", style={"fontSize": "11px"})
-                ], style={**KPI_CARD_STYLE, "borderTop": f"4px solid {SECONDARY}"})
-            ], md=3, sm=6, className="mb-3"),
-
-            dbc.Col([
-                html.Div([
-                    html.Div([
-                        html.Div([
-                            create_icon_badge("bi bi-scale", color=DANGER if bal_val < 0 else SUCCESS, bg="#FEF2F2" if bal_val < 0 else "#ECFDF5", size=15, box_size=32),
-                            html.Span("SOLDE COMMERCIAL", style={"fontSize": "11px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_GRAY, "letterSpacing": "0.8px", "marginLeft": "8px"}),
-                        ], className="d-flex align-items-center"),
-                        create_info_hover(
-                            "Solde Commercial & Couverture",
-                            f"Le déficit de {fmt_eur(bal_val)} en biens physiques est structurel. Les exportations financent {cov_val:.1f}% des importations de marchandises, le solde étant largement couvert par les services.",
-                            icon="ⓘ",
-                            variant="danger" if bal_val < 0 else "success",
-                            align="right"
-                        )
-                    ], className="d-flex align-items-center justify-content-between mb-1"),
-                    html.H2(fmt_eur(bal_val), style={"fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": DANGER if bal_val < 0 else SUCCESS, "margin": "2px 0 0 0"}),
-                    html.Small("Déficit structurel des biens physiques" if bal_val < 0 else "Excédent commercial des biens", className="text-muted", style={"fontSize": "11px"})
-                ], style={**KPI_CARD_STYLE, "borderTop": f"4px solid {DANGER if bal_val < 0 else SUCCESS}"})
-            ], md=3, sm=6, className="mb-3"),
-
-            dbc.Col([
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-pie-chart-fill", color="#B45309", bg="#FEF9E7", size=15, box_size=32),
-                        html.Span("TAUX DE COUVERTURE", style={"fontSize": "11px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_GRAY, "letterSpacing": "0.8px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-1"),
-                    html.H2(f"{cov_val:.1f}%", style={"fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "margin": "2px 0 0 0"}),
-                    html.Small(f"Les exports financent {cov_val:.0f}c par €1 importé", className="text-muted", style={"fontSize": "11px"})
-                ], style={**KPI_CARD_STYLE, "borderTop": f"4px solid {STATEC_YELLOW}"})
-            ], md=3, sm=6, className="mb-3"),
-        ])
-    ])
+    classes = [
+        "nav-tab-btn active" if TAB_ID_MAP[b_id] == current_tab else "nav-tab-btn"
+        for b_id in ALL_TAB_BTNS
+    ]
+    return tuple([current_tab] + classes)
 
 
-# ── Audience Switcher Callback ─────────────────────────────────────────────
-@callback(
-    Output("current-audience-mode", "data"),
-    Output("btn-mode-leaders", "style"),
-    Output("btn-mode-analysts", "style"),
-    Input("btn-mode-leaders", "n_clicks"),
-    Input("btn-mode-analysts", "n_clicks"),
-    State("current-audience-mode", "data"),
-    prevent_initial_call=True
-)
-def switch_audience_mode(n_lead, n_ana, current_mode):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return current_mode, dash.no_update, dash.no_update
-    btn_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    new_mode = "leaders" if btn_id == "btn-mode-leaders" else "analysts"
-
-    active_lead_style = {
-        "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-        "border": f"2px solid {STATEC_YELLOW}", "backgroundColor": "#FFFFFF",
-        "transition": "all 0.2s ease-in-out", "boxShadow": "0 4px 14px rgba(255, 200, 0, 0.28)"
-    }
-    inactive_lead_style = {
-        "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-        "border": f"1px solid {BORDER}", "backgroundColor": SURFACE,
-        "transition": "all 0.2s ease-in-out"
-    }
-
-    active_ana_style = {
-        "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-        "border": f"2px solid {STATEC_YELLOW}", "backgroundColor": "#FFFFFF",
-        "transition": "all 0.2s ease-in-out", "boxShadow": "0 4px 14px rgba(255, 200, 0, 0.28)"
-    }
-    inactive_ana_style = {
-        "cursor": "pointer", "padding": "16px 20px", "borderRadius": "8px",
-        "border": f"1px solid {BORDER}", "backgroundColor": SURFACE,
-        "transition": "all 0.2s ease-in-out"
-    }
-
-    if new_mode == "leaders":
-        return "leaders", active_lead_style, inactive_ana_style
-    else:
-        return "analysts", inactive_lead_style, active_ana_style
-
-
-# ── Sub-tabs Render Callback ───────────────────────────────────────────────
-@callback(
-    Output("sub-tabs-container", "children"),
-    Input("current-audience-mode", "data"),
-    Input("active-tab-store", "data")
-)
-def render_sub_tabs(mode, active_tab_store):
-    tab_label_style = {
-        "fontWeight": "700", "fontSize": "12.5px",
-        "fontFamily": "'Montserrat', sans-serif", "color": STATEC_GRAY,
-        "padding": "10px 18px", "border": "none", "letterSpacing": "0.3px"
-    }
-    tab_active_style = {
-        "fontWeight": "800", "fontSize": "12.5px",
-        "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY,
-        "border": "none", "borderBottom": f"3px solid {STATEC_YELLOW}",
-        "backgroundColor": "transparent", "letterSpacing": "0.3px"
-    }
-    if mode == "leaders":
-        default_tab = active_tab_store if active_tab_store in ["tab-resilience", "tab-macro", "tab-geopolitics"] else "tab-resilience"
-        return dbc.Tabs(id="sub-tabs", active_tab=default_tab, children=[
-            dbc.Tab(label="1. RÉSILIENCE & APPROVISIONNEMENT SOUVERAIN", tab_id="tab-resilience", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="2. SANTÉ MACROÉCONOMIQUE & TRAJECTOIRE", tab_id="tab-macro", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="3. EXPOSITION GÉOPOLITIQUE & CHOCS SAISONNIERS", tab_id="tab-geopolitics", label_style=tab_label_style, active_label_style=tab_active_style),
-        ], style={"borderBottom": "2px solid #E2E8F0"})
-    else:
-        default_tab = active_tab_store if active_tab_store in ["tab-studio", "tab-partners", "tab-products", "tab-drilldown", "tab-seasonality", "tab-benchmarks"] else "tab-studio"
-        return dbc.Tabs(id="sub-tabs", active_tab=default_tab, children=[
-            dbc.Tab(label="1. STUDIO GÉO-TARIFAIRE & DRILL-DOWN (Q1–Q4)", tab_id="tab-studio", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="2. LABORATOIRE DE SAISONNALITÉ (Q6)", tab_id="tab-seasonality", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="3. BENCHMARKS COMPARATIFS (Q5)", tab_id="tab-benchmarks", label_style=tab_label_style, active_label_style=tab_active_style),
-        ], style={"borderBottom": "2px solid #E2E8F0"})
-
-
-# ── Tab Content Router Callback ────────────────────────────────────────────
 @callback(
     Output("tab-content", "children"),
-    Input("sub-tabs", "active_tab"),
+    Input("active-tab-store", "data"),
     Input("global-year-dropdown", "value")
 )
-def render_tab_content(active_tab, selected_year):
+def render_main_tab_content(active_tab, selected_year):
     if active_tab == "tab-resilience":
         return render_tab_resilience(selected_year)
-    elif active_tab == "tab-macro" or active_tab == "tab-overview":
-        return render_tab_overview()
+    elif active_tab == "tab-macro":
+        return render_tab_macro(selected_year)
     elif active_tab == "tab-geopolitics":
         return render_tab_geopolitics(selected_year)
-    elif active_tab in ["tab-studio", "tab-partners", "tab-products", "tab-drilldown"]:
-        return render_studio_tab(selected_year)
+    elif active_tab == "tab-stress":
+        return render_tab_stress(selected_year)
+    elif active_tab == "tab-partners":
+        return render_tab_partners(selected_year)
+    elif active_tab == "tab-products":
+        return render_tab_products(selected_year)
+    elif active_tab == "tab-q3-partners":
+        return render_tab_q3_product_partners(selected_year)
+    elif active_tab == "tab-q4-drilldown":
+        return render_tab_q4_drilldown(selected_year)
     elif active_tab == "tab-benchmarks":
         return render_tab_benchmarks(selected_year)
     elif active_tab == "tab-seasonality":
         return render_tab_seasonality()
-    return html.Div("Loading perspective...")
+    return html.Div("Loading tab...")
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# TAB 1: MACRO OVERVIEW
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_overview():
-    kpis_df = load_overview_kpis()
-    if kpis_df.empty:
-        return html.Div("Overview data not available.")
-
-    # 1. Trajectory chart
-    fig_trajectory = go.Figure()
-    fig_trajectory.add_trace(go.Scatter(
-        x=kpis_df["year"], y=kpis_df["EXPORT"] / 1e9,
-        name="Exports", mode="lines+markers",
-        line=dict(color=PRIMARY, width=3),
-        marker=dict(size=6),
-        hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
-    ))
-    fig_trajectory.add_trace(go.Scatter(
-        x=kpis_df["year"], y=kpis_df["IMPORT"] / 1e9,
-        name="Imports", mode="lines+markers",
-        line=dict(color=SECONDARY, width=3),
-        marker=dict(size=6),
-        hovertemplate="Imports: €%{y:.2f}B (%{x})<extra></extra>"
-    ))
-    apply_plot_theme(fig_trajectory, title="Evolution of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
-
-    # 2. Balance Bar Chart
-    colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
-    fig_balance = go.Figure(go.Bar(
-        x=kpis_df["year"], y=kpis_df["trade_balance_eur"] / 1e9,
-        marker_color=colors,
-        hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
-    ))
-    apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (Deficit / Surplus)", y_title="Billion Euros (€B)", dtick_x=2)
-
-    # 3. European Integration Share
-    fig_eu = go.Figure()
-    if "intra_eu_export_share_pct" in kpis_df.columns:
-        fig_eu.add_trace(go.Scatter(
-            x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
-            name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
-        ))
-        fig_eu.add_trace(go.Scatter(
-            x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
-            name="Intra-EU Import Share %", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
-        ))
-    apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
-    fig_eu.update_yaxes(range=[55, 95])
-
-    return html.Div([
-        create_section_header(
-            "TRAJECTOIRE & SANTÉ MACROÉCONOMIQUE (2000–2026)",
-            "Analyse sur 25 ans des volumes d'échanges, du solde structurel des biens et de l'intégration dans le marché unique européen.",
-            badge_text="25 Ans • Macroéconomie",
-            badge_color=STATEC_NAVY,
-            info_title="Intégration Européenne (80–90% du Commerce)",
-            info_content="Entre 80% et 90% des flux physiques de biens sont réalisés au sein du marché unique de l'UE. Cette intégration offre une sécurité juridique totale et l'absence de droits de douane, mais expose l'économie aux aléas de la demande de ses voisins directs (Allemagne, Belgique, France).",
-            info_icon="bi bi-flag-fill",
-            info_variant="primary"
-        ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=8),
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_balance, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=4),
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_eu, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ]),
-        html.Div([
-            html.H6("FAITS SAILLANTS MACROÉCONOMIQUES (2000–2026)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
-            html.Ul([
-                html.Li("Croissance des flux : Le commerce de marchandises du Luxembourg est passé de 9,1 Mrd € d'exports / 12,2 Mrd € d'imports en 2000 à plus de 16,5 Mrd € d'exports / 25,7 Mrd € d'imports à ses récents sommets (+89% en volume total)."),
-                html.Li("Déficit structurel des biens : Le déficit commercial annuel en marchandises (-7 à -9,2 Mrd €) est une caractéristique structurelle des économies de services et de hubs financiers mondiaux, largement compensé par les excédents colossaux des services financiers et de gestion de fonds (+25 Mrd €)."),
-                html.Li("Intégration européenne intense : Entre 80% et 90% des flux physiques de biens sont réalisés au sein de l'Union européenne, avec la Belgique, l'Allemagne et la France constituant le socle indéboulonnable des approvisionnements."),
-            ], style={"fontSize": "13px", "color": TEXT_MUTED, "marginBottom": "0"})
-        ], style={**CARD_STYLE, "backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}", "borderLeft": f"4px solid {STATEC_YELLOW}"})
-    ])
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 3: GEOPOLITICAL EXPOSURE & SEASONAL SHOCKS (Leadership Pillar)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_geopolitics(selected_year):
-    partners_df = load_partner_rankings()
-    if partners_df.empty:
-        return html.Div("Geopolitical data not available.")
-
-    sub = partners_df[(partners_df["year"] == selected_year) & (partners_df["flow"] == "IMPORT")].copy()
-    if sub.empty:
-        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
-
-    eu_codes = {'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'}
-    neighbors = {'BE', 'DE', 'FR'}
-    tot_imp = sub['value_eur'].sum()
-    neigh_val = sub[sub['partner_code'].isin(neighbors)]['value_eur'].sum()
-    other_eu_val = sub[sub['partner_code'].isin(eu_codes - neighbors)]['value_eur'].sum()
-    row_val = max(0, tot_imp - (neigh_val + other_eu_val))
-
-    # 1. Donut Chart of Regional Import Exposure
-    fig_donut = go.Figure(go.Pie(
-        labels=["Direct Neighbors (BE, DE, FR)", "Other EU Member States", "Rest of World (US, CN, GB, etc.)"],
-        values=[neigh_val, other_eu_val, row_val],
-        hole=0.55,
-        marker_colors=[PRIMARY, "#38BDF8", "#94A3B8"],
-        textinfo="label+percent",
-        hovertemplate="%{label}<br>Value: €%{value:,.0f}<br>Share: %{percent}<extra></extra>"
-    ))
-    fig_donut.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=30, b=20),
-        font=dict(family="Inter, sans-serif", size=12, color=TEXT_PRIMARY),
-        showlegend=False
-    )
-
-    # 2. Top Non-EU Strategic Partners Bar Chart
-    non_eu_sub = sub[~sub['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8)
-    fig_non_eu = go.Figure(go.Bar(
-        x=non_eu_sub['value_eur'] / 1e6,
-        y=non_eu_sub['partner_name'],
-        orientation='h',
-        marker_color="#8B5CF6",
-        text=non_eu_sub['market_share_pct'].apply(lambda p: f"{p:.2f}%"),
-        textposition="outside",
-        hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
-    ))
-    apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
-    fig_non_eu.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
-
-    # 3. Executive Geopolitical Exposure Map
-    sub_map = add_iso3_column(sub).dropna(subset=["iso3"]).copy()
-    tier_colors = {
-        "Direct Neighbors (73.6% of Goods)": "#1D4ED8",
-        "EU Single Market Partners (17.9%)": "#0EA5E9",
-        "Strategic Non-EU Suppliers": "#8B5CF6",
-        "Other Partners": "#CBD5E1"
-    }
-
-    def assign_geo_tier(code):
-        if code in neighbors:
-            return "Direct Neighbors (73.6% of Goods)"
-        elif code in eu_codes:
-            return "EU Single Market Partners (17.9%)"
-        elif code in non_eu_sub["partner_code"].values:
-            return "Strategic Non-EU Suppliers"
-        return "Other Partners"
-
-    sub_map["tier"] = sub_map["partner_code"].apply(assign_geo_tier)
-
-    fig_geo = go.Figure()
-    for tier_name, tier_color in tier_colors.items():
-        t_sub = sub_map[sub_map["tier"] == tier_name]
-        if not t_sub.empty:
-            fig_geo.add_trace(go.Choropleth(
-                locations=t_sub["iso3"],
-                z=[1] * len(t_sub),
-                name=tier_name,
-                locationmode="ISO-3",
-                colorscale=[[0, tier_color], [1, tier_color]],
-                showscale=False,
-                marker_line_color="#94A3B8",
-                marker_line_width=0.8,
-                customdata=np.stack([
-                    t_sub["partner_code"],
-                    t_sub["partner_name"],
-                    t_sub["value_eur"],
-                    t_sub["market_share_pct"],
-                    t_sub["rank"],
-                    t_sub["tier"]
-                ], axis=-1),
-                hovertemplate="<b>%{customdata[1]}</b> (%{customdata[0]})<br>" +
-                              "Strategic Tier: <b>%{customdata[5]}</b><br>" +
-                              "Imports: €%{customdata[2]:,.0f}<br>" +
-                              "Share of All Imports: %{customdata[3]:.2f}%<br>" +
-                              "National Rank: #%{customdata[4]}<extra></extra>"
-            ))
-
-    # Add Luxembourg Pinpoint
-    fig_geo.add_trace(go.Scattergeo(
-        locations=["LUX"],
-        locationmode="ISO-3",
-        mode="markers+text",
-        marker=dict(size=14, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=2)),
-        text=["★ Luxembourg (Hub)"],
-        textposition="top right",
-        textfont=dict(family="'Montserrat', sans-serif", size=12, color=STATEC_NAVY, weight="bold"),
-        hoverinfo="skip",
-        showlegend=False
-    ))
-
-    apply_map_theme(fig_geo, scope="europe")
-    fig_geo.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(
-            orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
-            font=dict(family="'Inter', sans-serif", size=11, color=STATEC_NAVY),
-            bgcolor="rgba(255,255,255,0.92)",
-            bordercolor="#CBD5E1",
-            borderwidth=1
-        )
-    )
-
-    # 4. Seasonal timeline chart for leadership (August slump highlight)
-    sea_df = load_seasonal_decomposition()
-    sea_tot = sea_df[(sea_df["product_code"] == "TOTAL") & (sea_df["flow"] == "IMPORT")].sort_values("date").copy()
-    fig_aug = go.Figure()
-    if not sea_tot.empty:
-        factors = sea_tot.groupby("month")["seasonal_factor"].first().reset_index()
-        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
-        colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else PRIMARY) for m, f in zip(factors["month"], factors["seasonal_factor"])]
-        fig_aug = go.Figure(go.Bar(
-            x=factors["month_name"],
-            y=(factors["seasonal_factor"] - 1.0) * 100,
-            marker_color=colors,
-            text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
-            textposition="outside",
-            hovertemplate="Month %{x}: %{y:+.1f}% vs Annual Average<extra></extra>"
-        ))
-        fig_aug.add_hline(y=0, line_dash="solid", line_color=NEUTRAL)
-        apply_plot_theme(fig_aug, title="Cyclical Seasonality Shock: Deviation from Annual Trend (%)", y_title="% Deviation from Annual Trend")
-        fig_aug.update_yaxes(range=[-20, 15])
-
-    return html.Div([
-        create_section_header(
-            f"EXPOSITION GÉOPOLITIQUE & CHOCS SAISONNIERS ({selected_year})",
-            "Analyse des dépendances géographiques : concentration sur les voisins directs (BE, DE, FR), exposition aux fournisseurs tiers hors-UE et résilience aux arrêts saisonniers estivaux.",
-            badge_text="Alerte Souveraineté",
-            badge_color=STATEC_RED,
-            info_title="Effet 'Rotterdam-Anvers' & Congé Collectif",
-            info_content=[
-                html.Span("1. "),
-                html.Strong("Effet Rotterdam-Anvers : "),
-                html.Span("Plus de 33% des marchandises physiques arrivent via les plateformes portuaires belges et néerlandaises (effet de transit maritime). Tout goulot d'étranglement sur la mer du Nord se répercute sous 48 heures au Grand-Duché. "),
-                html.Br(),
-                html.Span("2. "),
-                html.Strong("Choc d'Août (-14,4%) : "),
-                html.Span("Ralentissement cyclique récurrent causé par le congé collectif du secteur du bâtiment et les fermetures annuelles des usines européennes."),
-            ],
-            info_icon="bi bi-shield-exclamation",
-            info_variant="danger"
-        ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6("CONCENTRATION RÉGIONALE DES IMPORTATIONS", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    html.P(f"En {selected_year}, plus de 73% des biens physiques importés proviennent de Belgique, d'Allemagne et de France.", className="text-muted", style={"fontSize": "12px"}),
-                    dcc.Graph(figure=fig_donut, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=5),
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=7),
-        ], className="mb-3"),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6("CARTOGRAPHIE DE SOUVERAINETÉ : DÉPENDANCES PAR PALIER STRATÉGIQUE", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    html.P("Visualisation des corridors d'approvisionnement : Voisins immédiats (73,6%), Marché unique européen (17,9%) et Fournisseurs stratégiques hors-UE.", className="text-muted", style={"fontSize": "12px"}),
-                    dcc.Graph(figure=fig_geo, config={"displayModeBar": False}, style={"height": "440px"})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ], className="mb-3"),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_aug, config={"displayModeBar": False}),
-                    html.Div([
-                        html.Strong("Recommandation Opérationnelle pour Décideurs : ", style={"color": DANGER, "fontSize": "12px", "fontFamily": "'Montserrat', sans-serif"}),
-                        html.Span(
-                            "La contraction de -14,4% observée chaque mois d'août est d'origine saisonnière (congés industriels et congé collectif du bâtiment). Les stocks stratégiques prioritaires (médicaments d'urgence hospitaliers, matériaux de construction, carburants de chauffe) doivent impérativement être consolidés en juin et juillet.",
-                            style={"fontSize": "12px", "color": TEXT_MUTED}
-                        )
-                    ], className="mt-2 p-3 rounded", style={"backgroundColor": "#FEF2F2", "border": "1px solid #FCA5A5", "borderLeft": f"4px solid {DANGER}"})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ])
-    ])
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 1 (ANALYST): STUDIO GÉO-TARIFAIRE & DRILL-DOWN BILATÉRAL (Q1–Q4)
-# ───────────────────────────────────────────────────────────────────────────
-
-ISO2_NAMES = {
-    "DE": "Allemagne", "FR": "France", "BE": "Belgique", "NL": "Pays-Bas",
-    "US": "États-Unis", "IT": "Italie", "GB": "Royaume-Uni", "ES": "Espagne",
-    "CN": "Chine", "CH": "Suisse", "PL": "Pologne", "AT": "Autriche",
-    "SE": "Suède", "JP": "Japon", "CZ": "Tchéquie", "DK": "Danemark",
-    "IE": "Irlande", "PT": "Portugal", "TR": "Turquie", "IN": "Inde",
-    "BR": "Brésil", "KR": "Corée du Sud", "NO": "Norvège", "RU": "Russie",
-    "CA": "Canada", "MX": "Mexique", "AU": "Australie", "ZA": "Afrique du Sud",
-    "HU": "Hongrie", "RO": "Roumanie", "SG": "Singapour", "LU": "Luxembourg"
-}
-
-def get_country_name(iso2):
-    return ISO2_NAMES.get(str(iso2).upper(), str(iso2))
-
-
-def get_partner_products(partner_code, flow, year, level=2):
-    """
-    Unified product extractor for any trading partner across HS2, HS4, and CN8.
-    Returns (df, is_fallback, level_label).
-    """
-    level = int(level)
-    partner_code = str(partner_code).upper()
-    top_5 = ["BE", "DE", "FR", "NL", "US"]
-
-    if level == 8 and partner_code in top_5:
-        df8 = load_drilldown_lvl8()
-        sub = df8[(df8["partner_code"] == partner_code) & (df8["flow"] == flow)].copy()
-        if not sub.empty:
-            sub = sub.sort_values("value_eur", ascending=False)
-            sub["short_name"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
-            return sub, False, "CN8 (Lignes tarifaires douanières à 8 chiffres)"
-
-    if level == 4 and partner_code in top_5:
-        df4 = load_drilldown_lvl4()
-        sub = df4[(df4["partner_code"] == partner_code) & (df4["flow"] == flow)].copy()
-        if not sub.empty:
-            sub = sub.sort_values("value_eur", ascending=False)
-            sub["short_name"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
-            return sub, False, "HS4 (Sous-positions tarifaires à 4 chiffres)"
-
-    # Universal Fallback for any of the 238 countries in product_partners
-    partners_df = load_product_partners()
-    valid_years = sorted(partners_df["year"].unique())
-    target_year = year if year in valid_years else max(valid_years)
-
-    sub = partners_df[(partners_df["partner_code"] == partner_code) &
-                      (partners_df["flow"] == flow) &
-                      (partners_df["year"] == target_year)].copy()
-
-    if sub.empty:
-        sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == flow)].copy()
-        if not sub.empty:
-            target_year = sub["year"].max()
-            sub = sub[sub["year"] == target_year]
-
-    if not sub.empty:
-        sub = sub.rename(columns={"hs2_code": "product_code", "hs2_name": "product_name"})
-        sub = sub.sort_values("value_eur", ascending=False)
-        sub["short_name"] = "Ch." + sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
-        is_fallback = (level in [4, 8] and partner_code not in top_5)
-        return sub, is_fallback, "HS2 (Chapitres à 2 chiffres)"
-
-    return pd.DataFrame(), False, "Données non disponibles"
-
-
-def render_studio_tab(selected_year):
-    prod_df = load_product_rankings()
-    prod_options = []
-    if not prod_df.empty:
-        hs2_unique = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
-        prod_options = [
-            {"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:45]}", "value": str(r["hs2_code"])}
-            for _, r in hs2_unique.iterrows()
-        ]
-    default_prod = "87" if any(o["value"] == "87" for o in prod_options) else (prod_options[0]["value"] if prod_options else "87")
-
-    initial_layout = render_studio_perspective_layout("country", selected_year)
-
-    return html.Div([
-        # Section Header with Info Tooltip
-        create_section_header(
-            f"STUDIO GÉO-TARIFAIRE & DRILL-DOWN BILATÉRAL ({selected_year})",
-            "Espace analytique unifié interconnecté : cliquez sur n'importe quel pays sur la carte ou dans le palmarès pour projeter en temps réel son panier de produits (Q2), ses fournisseurs alternatifs (Q3) et plonger jusqu'aux lignes douanières CN8 à 8 chiffres (Q4).",
-            badge_text="Eurostat Q1 • Q2 • Q3 • Q4",
-            badge_color=STATEC_BLUE,
-            info_title="Studio Unifié & Niveaux de Nomenclature Douanière",
-            info_content=[
-                html.P("Ce studio interconnecte les 4 dimensions fondamentales du commerce extérieur :", style={"fontWeight": "600", "marginBottom": "6px"}),
-                html.Ul([
-                    html.Li("Q1 (Partenaires) : Carte choroplèthe mondiale et classement des flux bilatéraux."),
-                    html.Li("Q2 (Produits) : Répartition du panier d'échanges et sections macroéconomiques."),
-                    html.Li("Q3 (Fournisseurs & HHI) : Indice de dépendance et cartographie des pays d'origine par produit."),
-                    html.Li("Q4 (Drill-Down Tarifaire) : Du chapitre (HS2) à la sous-position (HS4) et à la ligne fine douanière (CN8)."),
-                ], style={"paddingLeft": "18px", "marginBottom": "0"})
-            ],
-            info_icon="bi bi-grid-1x2-fill",
-            info_variant="primary"
-        ),
-
-        # Master Interactive Studio Control Ribbon
-        html.Div([
-            dbc.Row([
-                # Perspective Toggle
-                dbc.Col([
-                    html.Label([
-                        html.I(className="bi bi-sliders me-1 text-primary"),
-                        html.Span("Mode d'Exploration :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
-                    ], className="d-block mb-1"),
-                    dbc.RadioItems(
-                        id="studio-perspective-radio",
-                        options=[
-                            {"label": "🌍 Par Pays (Q1 & Q4)", "value": "country"},
-                            {"label": "📦 Par Produit (Q2 & Q3)", "value": "product"},
-                        ],
-                        value="country",
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-primary btn-sm px-3 py-1",
-                        label_checked_class_name="btn btn-primary btn-sm px-3 py-1 text-white fw-bold",
-                        style={"fontSize": "12px"}
-                    )
-                ], md=4, sm=12, className="mb-2 mb-md-0"),
-
-                # Flow Radio
-                dbc.Col([
-                    html.Label([
-                        html.I(className="bi bi-arrow-left-right me-1 text-primary"),
-                        html.Span("Flux Douanier :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
-                    ], className="d-block mb-1"),
-                    dbc.RadioItems(
-                        id="studio-flow-radio",
-                        options=[
-                            {"label": "Importations (Fournisseurs)", "value": "IMPORT"},
-                            {"label": "Exportations (Clients)", "value": "EXPORT"},
-                        ],
-                        value="IMPORT",
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
-                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
-                        style={"fontSize": "12px"}
-                    )
-                ], md=3, sm=6, className="mb-2 mb-md-0"),
-
-                # Geographic Scope Radio
-                dbc.Col([
-                    html.Label([
-                        html.I(className="bi bi-geo-alt me-1 text-primary"),
-                        html.Span("Périmètre Géo :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
-                    ], className="d-block mb-1"),
-                    dbc.RadioItems(
-                        id="studio-scope-radio",
-                        options=[
-                            {"label": "Monde", "value": "GLOBAL"},
-                            {"label": "UE-27", "value": "EU27"},
-                            {"label": "Extra-UE", "value": "EXTRA_EU"},
-                        ],
-                        value="GLOBAL",
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
-                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
-                        style={"fontSize": "12px"}
-                    )
-                ], md=2, sm=6, className="mb-2 mb-md-0"),
-
-                # Granularity Selector
-                dbc.Col([
-                    html.Label([
-                        html.I(className="bi bi-layers me-1 text-primary"),
-                        html.Span("Nomenclature Tarifaire :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
-                    ], className="d-block mb-1"),
-                    dbc.RadioItems(
-                        id="studio-granularity-radio",
-                        options=[
-                            {"label": "HS2 (2 ch.)", "value": 2},
-                            {"label": "HS4 (4 ch.)", "value": 4},
-                            {"label": "CN8 (8 ch.)", "value": 8},
-                        ],
-                        value=2,
-                        inline=True,
-                        className="btn-group",
-                        input_class_name="btn-check",
-                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
-                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
-                        style={"fontSize": "12px"}
-                    )
-                ], md=3, sm=12)
-            ], align="center")
-        ], style={
-            "backgroundColor": "#FFFFFF", "borderRadius": "10px", "padding": "12px 18px",
-            "boxShadow": "0 2px 8px rgba(0,0,0,0.04)", "border": f"1px solid {BORDER}",
-            "marginBottom": "16px"
-        }),
-
-        # Stores to preserve selection state across interactions
-        dcc.Store(id="studio-selected-partner", data="DE"),
-        dcc.Store(id="studio-selected-product", data=default_prod),
-
-        # Dynamic Perspective Container (pre-populated with initial layout)
-        html.Div(initial_layout, id="studio-perspective-container")
-    ])
-
-
-# ── Studio Callbacks ───────────────────────────────────────────────────────
-
-@callback(
-    Output("studio-selected-partner", "data"),
-    Input("studio-world-map", "clickData"),
-    Input("studio-top-partners-bar", "clickData"),
-    State("studio-selected-partner", "data")
-)
-def update_studio_selected_partner(map_click, bar_click, current_partner):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return current_partner or "DE"
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
-    if trigger_id == "studio-world-map" and map_click:
-        pt = map_click["points"][0]
-        if "customdata" in pt and pt["customdata"] is not None:
-            c = pt["customdata"]
-            res = c[0] if isinstance(c, (list, tuple, np.ndarray)) else str(c)
-            return str(res).strip().upper()
-        if "location" in pt:
-            for c2, c3 in ISO2_TO_ISO3.items():
-                if c3 == pt["location"]:
-                    return c2
-    elif trigger_id == "studio-top-partners-bar" and bar_click:
-        pt = bar_click["points"][0]
-        if "customdata" in pt and pt["customdata"] is not None:
-            c = pt["customdata"]
-            res = c[0] if isinstance(c, (list, tuple, np.ndarray)) else str(c)
-            return str(res).strip().upper()
-        if "y" in pt:
-            y_str = str(pt["y"])
-            if "(" in y_str and ")" in y_str:
-                return y_str.split("(")[-1].split(")")[0].strip().upper()
-            for c2, name in ISO2_NAMES.items():
-                if name.lower() in y_str.lower():
-                    return c2
-    return current_partner or "DE"
-
-
-@callback(
-    Output("studio-perspective-container", "children"),
-    Input("studio-perspective-radio", "value"),
-    Input("global-year-dropdown", "value")
-)
-def render_studio_perspective_layout(perspective, year):
-    year = int(year or 2024)
-    if perspective == "country":
-        # Pre-compute initial figures to guarantee instant display
-        init_map, init_bar, init_hist = update_studio_partner_left("IMPORT", year, "GLOBAL", "DE")
-        init_spotlight, init_treemap, init_prod_bar = update_studio_partner_right("DE", "IMPORT", year, 2)
-
-        return dbc.Row([
-            # Left Column (Spatial & Rankings Q1)
-            dbc.Col([
-                # Interactive World Map Card
-                html.Div([
-                    html.Div([
-                        html.Div([
-                            create_icon_badge("bi bi-globe-americas", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
-                            html.Div([
-                                html.H6("CARTOGRAPHIE MONDIALE DES ÉCHANGES (Q1)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
-                                html.P("Cliquez sur un pays sur la carte ou le bar-chart pour projeter son panier de biens à droite.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
-                            ], className="ms-2")
-                        ], className="d-flex align-items-center"),
-                    ], className="mb-2"),
-                    dcc.Graph(id="studio-world-map", figure=init_map, config={"displayModeBar": False})
-                ], style={**CARD_STYLE, "marginBottom": "16px"}),
-
-                # Top 10 Partners Bar Card
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-bar-chart-line-fill", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
-                        html.H6("PALMARÈS DES PARTENAIRES COMMERCIAUX (Q1)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-2"),
-                    dcc.Graph(id="studio-top-partners-bar", figure=init_bar, config={"displayModeBar": False})
-                ], style={**CARD_STYLE, "marginBottom": "16px"}),
-
-                # Historical Trade Trend Card
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-graph-up-arrow", color="#059669", bg="#D1FAE5", size=15, box_size=30),
-                        html.H6("TRAJECTOIRE HISTORIQUE BILATÉRALE (2000–2024)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-2"),
-                    dcc.Graph(id="studio-partner-history-chart", figure=init_hist, config={"displayModeBar": False})
-                ], style=CARD_STYLE),
-            ], md=7, sm=12),
-
-            # Right Column (Bilateral Products & CN8 Drill-Down Q2 & Q4)
-            dbc.Col([
-                # Selected Country Spotlight Header Card
-                html.Div(init_spotlight, id="studio-partner-spotlight-container"),
-
-                # Products Treemap Card
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-boxes", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
-                        html.Div([
-                            html.H6("COMPOSITION DU PANIER ÉCHANGÉ (Q2 & Q4)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
-                            html.P("Survolez ou cliquez sur les rectangles pour inspecter les flux par catégorie de biens.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
-                        ], className="ms-2")
-                    ], className="d-flex align-items-center mb-2"),
-                    dcc.Graph(id="studio-partner-treemap", figure=init_treemap, config={"displayModeBar": False})
-                ], style={**CARD_STYLE, "marginBottom": "16px"}),
-
-                # Top Products Bar Card
-                html.Div([
-                    html.Div([
-                        create_icon_badge("bi bi-list-ol", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
-                        html.H6("PRINCIPALES MARCHANDISES AU NIVEAU SÉLECTIONNÉ", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
-                    ], className="d-flex align-items-center mb-2"),
-                    dcc.Graph(id="studio-partner-products-bar", figure=init_prod_bar, config={"displayModeBar": False})
-                ], style=CARD_STYLE),
-            ], md=5, sm=12)
-        ])
-    else:
-        # Product Perspective (Q2 & Q3)
-        prod_df = load_product_rankings()
-        prod_options = []
-        if not prod_df.empty:
-            hs2_unique = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
-            prod_options = [
-                {"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:50]}", "value": str(r["hs2_code"])}
-                for _, r in hs2_unique.iterrows()
-            ]
-        default_prod = "87" if any(o["value"] == "87" for o in prod_options) else (prod_options[0]["value"] if prod_options else "87")
-
-        init_p_map, init_p_supp, init_p_kpi, init_p_hist = update_studio_product_perspective(default_prod, "IMPORT", year, "GLOBAL")
-
-        return html.Div([
-            # Product Selector Bar
-            html.Div([
-                dbc.Row([
-                    dbc.Col([
-                        html.Label([
-                            create_icon_badge("bi bi-box-seam", color=PRIMARY, bg="#EFF6FF", size=14, box_size=28),
-                            html.Span("Sélectionnez la Marchandise / Chapitre HS2 à Analyser :", style={"fontWeight": "700", "fontSize": "12px", "color": STATEC_NAVY, "marginLeft": "8px"})
-                        ], className="d-flex align-items-center mb-1"),
-                        dcc.Dropdown(
-                            id="studio-product-dropdown",
-                            options=prod_options,
-                            value=default_prod,
-                            clearable=False,
-                            style={"fontSize": "13px"}
-                        )
-                    ], md=12)
-                ])
-            ], style={"backgroundColor": "#FFFFFF", "borderRadius": "8px", "padding": "12px 16px", "border": f"1px solid {BORDER}", "marginBottom": "16px"}),
-
-            dbc.Row([
-                # Left Column: Supplier Map & Concentration Bar (Q3)
-                dbc.Col([
-                    html.Div([
-                        html.Div([
-                            create_icon_badge("bi bi-pin-map-fill", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
-                            html.Div([
-                                html.H6("CARTOGRAPHIE DES FOURNISSEURS / CLIENTS DE CE BIEN (Q3)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
-                                html.P("Intensité géographique des pays d'origine ou de destination pour le produit sélectionné.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
-                            ], className="ms-2")
-                        ], className="d-flex align-items-center mb-2"),
-                        dcc.Graph(id="studio-product-map", figure=init_p_map, config={"displayModeBar": False})
-                    ], style={**CARD_STYLE, "marginBottom": "16px"}),
-
-                    html.Div([
-                        html.Div([
-                            create_icon_badge("bi bi-bar-chart-steps", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
-                            html.H6("RÉPARTITION DES PAYS SOURCES & PARTS DE MARCHÉ (Q3)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
-                        ], className="d-flex align-items-center mb-2"),
-                        dcc.Graph(id="studio-product-suppliers-bar", figure=init_p_supp, config={"displayModeBar": False})
-                    ], style=CARD_STYLE),
-                ], md=7, sm=12),
-
-                # Right Column: Vulnerability & Historical Shifts (Q2 & Q3)
-                dbc.Col([
-                    html.Div(init_p_kpi, id="studio-product-kpi-container"),
-
-                    html.Div([
-                        html.Div([
-                            create_icon_badge("bi bi-clock-history", color="#059669", bg="#D1FAE5", size=15, box_size=30),
-                            html.H6("ÉVOLUTION HISTORIQUE DE CE BIEN (2000–2024) (Q2)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
-                        ], className="d-flex align-items-center mb-2"),
-                        dcc.Graph(id="studio-product-history-chart", figure=init_p_hist, config={"displayModeBar": False})
-                    ], style=CARD_STYLE),
-                ], md=5, sm=12)
-            ])
-        ])
-
-
-@callback(
-    Output("studio-world-map", "figure"),
-    Output("studio-top-partners-bar", "figure"),
-    Output("studio-partner-history-chart", "figure"),
-    Input("studio-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("studio-scope-radio", "value"),
-    Input("studio-selected-partner", "data")
-)
-def update_studio_partner_left(flow, year, scope, selected_partner):
-    partners_df = load_partner_rankings()
-    selected_partner = selected_partner or "DE"
-    year = int(year or 2024)
-
-    sub = partners_df[(partners_df["year"] == year) & (partners_df["flow"] == flow)].copy()
-    if sub.empty:
-        avail_years = partners_df["year"].unique()
-        if len(avail_years) > 0:
-            sub = partners_df[(partners_df["year"] == max(avail_years)) & (partners_df["flow"] == flow)].copy()
-
-    # Apply Scope
-    if scope == "EU27":
-        sub = sub[sub["partner_code"].isin(list(ISO2_NAMES.keys()))].copy()
-    elif scope == "EXTRA_EU":
-        sub = sub[~sub["partner_code"].isin(["BE", "DE", "FR", "NL", "IT", "ES", "PL", "AT", "SE", "DK", "IE", "PT", "CZ", "HU", "RO", "BG", "HR", "SK", "SI", "LT", "LV", "EE", "CY", "MT", "GR", "FI"])].copy()
-
-    # 1. Map Figure
-    sub_map = add_iso3_column(sub)
-    sub_valid = sub_map.dropna(subset=["iso3"]).copy()
-
-    sub_valid["color_val"] = np.log10(np.maximum(10000.0, sub_valid["value_eur"]))
-    cmin = 6.0
-    cmax = max(7.0, sub_valid["color_val"].max())
-
-    colorscale = [
-        [0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"],
-        [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]
-    ] if flow == "IMPORT" else [
-        [0.0, "#E0F2FE"], [0.2, "#BAE6FD"], [0.4, "#38BDF8"],
-        [0.65, "#0284C7"], [0.85, "#0066B2"], [1.0, "#001A38"]
-    ]
-
-    fig_map = go.Figure()
-
-    # Base choropleth trace
-    fig_map.add_trace(go.Choropleth(
-        locations=sub_valid["iso3"],
-        z=sub_valid["color_val"],
-        text=sub_valid["partner_name"],
-        customdata=np.stack([sub_valid["partner_code"], sub_valid["value_eur"], sub_valid["market_share_pct"]], axis=-1),
-        hovertemplate="<b>%{text} (%{customdata[0]})</b><br>Volume : €%{customdata[1]:,.0f}<br>Part : %{customdata[2]:.2f}%<extra></extra>",
-        colorscale=colorscale,
-        zmin=cmin, zmax=cmax,
-        colorbar=dict(
-            title="Volume",
-            tickvals=[6, 7, 8, 9, 10],
-            ticktext=["1 M€", "10 M€", "100 M€", "1 Mrd€", "10 Mrd€"],
-            len=0.7, thickness=12, x=0.98, y=0.5
-        )
-    ))
-
-    # Luxembourg Hub Pinpoint
-    fig_map.add_trace(go.Scattergeo(
-        lon=[6.13], lat=[49.61],
-        mode="markers+text",
-        marker=dict(size=14, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=2)),
-        text=["★ Luxembourg"],
-        textposition="top center",
-        textfont=dict(size=11, family="Montserrat", color=STATEC_NAVY),
-        hoverinfo="text",
-        name="Luxembourg (Hub)"
-    ))
-
-    # Selected Partner Golden Ring Highlight
-    sel_iso3 = ISO2_TO_ISO3.get(selected_partner)
-    if sel_iso3:
-        fig_map.add_trace(go.Choropleth(
-            locations=[sel_iso3],
-            z=[cmax],
-            colorscale=[[0.0, STATEC_YELLOW], [1.0, STATEC_YELLOW]],
-            showscale=False,
-            hoverinfo="skip",
-            marker_line_color=STATEC_YELLOW,
-            marker_line_width=3.5,
-        ))
-
-    apply_map_theme(fig_map, scope="world" if scope != "EU27" else "europe")
-    fig_map.update_layout(
-        title=dict(text=f"Planisphère des Partenaires ({year})", font=dict(family="Montserrat", size=13, color=STATEC_NAVY)),
-        height=430,
-        margin=dict(l=10, r=10, t=35, b=10)
-    )
-
-    # 2. Top 10 Partners Bar Chart
-    top10 = sub.sort_values("value_eur", ascending=True).tail(10).copy()
-    bar_colors = [STATEC_YELLOW if r["partner_code"] == selected_partner else (PRIMARY if flow == "EXPORT" else SECONDARY) for _, r in top10.iterrows()]
-
-    fig_bar = go.Figure(go.Bar(
-        x=top10["value_eur"] / 1e6,
-        y=[f"{r['partner_name']} ({r['partner_code']})" for _, r in top10.iterrows()],
-        orientation="h",
-        marker_color=bar_colors,
-        customdata=top10["partner_code"],
-        text=[f"€{v/1e6:.1f}M ({s:.1f}%)" for v, s in zip(top10["value_eur"], top10["market_share_pct"])],
-        textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Volume : €%{x:.1f}M<extra></extra>"
-    ))
-    apply_plot_theme(fig_bar, title=f"Top 10 Partenaires en {year} (€M)", x_title="Millions d'Euros (€M)")
-    fig_bar.update_layout(height=320, margin=dict(l=10, r=60, t=35, b=30), yaxis=dict(autorange="reversed"))
-
-    # 3. Bilateral Historical Trade Trend (2000-2024)
-    hist_sub = partners_df[(partners_df["partner_code"] == selected_partner) & (partners_df["flow"] == flow)].sort_values("year")
-    fig_hist = go.Figure()
-    if not hist_sub.empty:
-        fig_hist.add_trace(go.Scatter(
-            x=hist_sub["year"],
-            y=hist_sub["value_eur"] / 1e6,
-            mode="lines+markers",
-            line=dict(color=PRIMARY if flow == "EXPORT" else SECONDARY, width=3),
-            marker=dict(size=6, color=STATEC_YELLOW, line=dict(color=STATEC_NAVY, width=1.5)),
-            fill="tozeroy",
-            fillcolor="rgba(0, 102, 178, 0.08)" if flow == "EXPORT" else "rgba(67, 56, 202, 0.08)",
-            hovertemplate="Année %{x}<br>Volume : €%{y:,.1f}M<extra></extra>"
-        ))
-    partner_name = get_country_name(selected_partner)
-    apply_plot_theme(fig_hist, title=f"Évolution des Échanges avec {partner_name} (2000–2024)", x_title="Année", y_title="M€")
-    fig_hist.update_layout(height=260, margin=dict(l=10, r=20, t=35, b=30))
-
-    return fig_map, fig_bar, fig_hist
-
-
-@callback(
-    Output("studio-partner-spotlight-container", "children"),
-    Output("studio-partner-treemap", "figure"),
-    Output("studio-partner-products-bar", "figure"),
-    Input("studio-selected-partner", "data"),
-    Input("studio-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("studio-granularity-radio", "value")
-)
-def update_studio_partner_right(selected_partner, flow, year, granularity):
-    selected_partner = selected_partner or "DE"
-    granularity = int(granularity or 2)
-    partner_name = get_country_name(selected_partner)
-    year = int(year or 2024)
-
-    # 1. Partner Metrics
-    partners_df = load_partner_rankings()
-    sub_p = partners_df[(partners_df["partner_code"] == selected_partner) &
-                        (partners_df["flow"] == flow) &
-                        (partners_df["year"] == year)]
-    if sub_p.empty:
-        sub_p = partners_df[(partners_df["partner_code"] == selected_partner) & (partners_df["flow"] == flow)]
-        if not sub_p.empty:
-            sub_p = sub_p[sub_p["year"] == sub_p["year"].max()]
-
-    val_eur = sub_p["value_eur"].values[0] if not sub_p.empty else 0.0
-    share_pct = sub_p["market_share_pct"].values[0] if not sub_p.empty else 0.0
-    rank = int(sub_p["rank"].values[0]) if not sub_p.empty and "rank" in sub_p.columns else 1
-
-    # 2. Extract Partner Products
-    prod_sub, is_fallback, level_label = get_partner_products(selected_partner, flow, year, level=granularity)
-
-    # Spotlight Header
-    badge_color = SUCCESS if rank <= 3 else (PRIMARY if rank <= 10 else STATEC_GRAY)
-    flow_text = "Fournisseur" if flow == "IMPORT" else "Client"
-
-    spotlight = html.Div([
-        html.Div([
-            html.Div([
-                create_icon_badge("bi bi-flag-fill", color="#B45309", bg="#FEF3C7", size=18, box_size=38),
-                html.Div([
-                    html.Div([
-                        html.Span(f"{partner_name.upper()} ({selected_partner})", style={
-                            "fontSize": "16px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY
-                        }),
-                        html.Span(f"#{rank} {flow_text}", className="badge ms-2", style={"backgroundColor": badge_color, "color": "#FFFFFF", "fontSize": "11px", "fontWeight": "700"}),
-                    ]),
-                    html.Span(f"Volume d'échange : {fmt_eur(val_eur)} • {share_pct:.1f}% des {flow.lower()}s du Luxembourg", style={
-                        "fontSize": "12px", "color": TEXT_MUTED, "fontWeight": "600"
-                    })
-                ], className="ms-2")
-            ], className="d-flex align-items-center"),
-
-            # Depth Indicator
-            html.Div([
-                html.Span(level_label, className="badge", style={
-                    "backgroundColor": "#EFF6FF", "color": PRIMARY, "border": "1px solid #BFDBFE", "fontSize": "10.5px", "fontWeight": "700"
-                })
-            ])
-        ], className="d-flex align-items-center justify-content-between"),
-
-        # Fallback Alert if applicable
-        html.Div([
-            html.I(className="bi bi-info-circle-fill me-1 text-warning"),
-            html.Span("Drill-down CN8 à 8 chiffres disponible pour le Top 5 partenaires (DE, BE, FR, NL, US). Pour les autres partenaires mondiaux, affichage universel au niveau HS2 (Chapitres).", style={"fontSize": "11px", "color": "#92400E"})
-        ], className="mt-2 p-2 rounded", style={"backgroundColor": "#FFFBEB", "border": "1px solid #FCD34D"}) if is_fallback else html.Div()
-    ], style={
-        "backgroundColor": "#FFFFFF", "borderRadius": "10px", "padding": "14px 16px",
-        "boxShadow": "0 2px 6px rgba(0,0,0,0.04)", "border": f"1px solid {BORDER}",
-        "borderLeft": f"4px solid {STATEC_YELLOW}", "marginBottom": "16px"
-    })
-
-    # 3. Treemap Figure
-    if prod_sub.empty:
-        fig_treemap = go.Figure()
-        fig_treemap.add_annotation(text="Aucun détail produit disponible pour ce pays", showarrow=False)
-        apply_plot_theme(fig_treemap)
-        fig_treemap.update_layout(height=360)
-
-        fig_prod_bar = go.Figure()
-        apply_plot_theme(fig_prod_bar)
-        fig_prod_bar.update_layout(height=300)
-    else:
-        top_prods = prod_sub.head(25).copy()
-        fig_treemap = px.treemap(
-            top_prods,
-            path=["short_name"],
-            values="value_eur",
-            color="value_eur",
-            color_continuous_scale="Viridis" if flow == "IMPORT" else "Blues"
-        )
-        fig_treemap.update_traces(
-            hovertemplate="<b>%{label}</b><br>Valeur : €%{value:,.0f}<extra></extra>",
-            textinfo="label+value"
-        )
-        apply_plot_theme(fig_treemap, title=f"Panier de Biens — {partner_name} ({len(top_prods)} flux)")
-        fig_treemap.update_layout(height=370, margin=dict(l=10, r=10, t=35, b=10), coloraxis_showscale=False)
-
-        # 4. Top Products Horizontal Bar Chart
-        bar_sub = prod_sub.head(10).sort_values("value_eur", ascending=True)
-        fig_prod_bar = go.Figure(go.Bar(
-            x=bar_sub["value_eur"] / 1e6,
-            y=bar_sub["short_name"],
-            orientation="h",
-            marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
-            text=[fmt_eur(v) for v in bar_sub["value_eur"]],
-            textposition="outside",
-            hovertemplate="<b>%{y}</b><br>Valeur : €%{x:.2f}M<extra></extra>"
-        ))
-        apply_plot_theme(fig_prod_bar, title=f"Top Marchandises avec {partner_name} ({level_label.split(' ')[0]})", x_title="Millions d'Euros (€M)")
-        fig_prod_bar.update_layout(height=320, margin=dict(l=10, r=50, t=35, b=25), yaxis=dict(autorange="reversed"))
-
-    return spotlight, fig_treemap, fig_prod_bar
-
-
-@callback(
-    Output("studio-product-map", "figure"),
-    Output("studio-product-suppliers-bar", "figure"),
-    Output("studio-product-kpi-container", "children"),
-    Output("studio-product-history-chart", "figure"),
-    Input("studio-product-dropdown", "value"),
-    Input("studio-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("studio-scope-radio", "value")
-)
-def update_studio_product_perspective(product_code, flow, year, scope):
-    product_code = str(product_code or "87")
-    partners_df = load_product_partners()
-    year = int(year or 2024)
-
-    valid_years = sorted(partners_df["year"].unique())
-    target_year = year if year in valid_years else max(valid_years)
-
-    sub = partners_df[(partners_df["hs2_code"] == product_code) &
-                      (partners_df["flow"] == flow) &
-                      (partners_df["year"] == target_year)].copy()
-
-    if sub.empty:
-        sub = partners_df[(partners_df["hs2_code"] == product_code) & (partners_df["flow"] == flow)].copy()
-        if not sub.empty:
-            target_year = sub["year"].max()
-            sub = sub[sub["year"] == target_year]
-
-    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Produit {product_code}"
-    hhi_val = sub["hhi"].iloc[0] if not sub.empty and "hhi" in sub.columns else 1200.0
-    tot_eur = sub["total_eur"].iloc[0] if not sub.empty and "total_eur" in sub.columns else sub["value_eur"].sum()
-
-    # 1. Product Map
-    sub_map = add_iso3_column(sub)
-    sub_valid = sub_map.dropna(subset=["iso3"]).copy()
-
-    fig_map = go.Figure()
-    if not sub_valid.empty:
-        sub_valid["color_val"] = np.log10(np.maximum(1000.0, sub_valid["value_eur"]))
-        cmin = 4.0
-        cmax = max(5.0, sub_valid["color_val"].max())
-
-        fig_map.add_trace(go.Choropleth(
-            locations=sub_valid["iso3"],
-            z=sub_valid["color_val"],
-            text=sub_valid["partner_name"],
-            customdata=np.stack([sub_valid["partner_code"], sub_valid["value_eur"], sub_valid["partner_share_pct"]], axis=-1),
-            hovertemplate="<b>%{text} (%{customdata[0]})</b><br>Fourniture : €%{customdata[1]:,.0f}<br>Part : %{customdata[2]:.1f}%<extra></extra>",
-            colorscale=[[0.0, "#ECFDF5"], [0.3, "#A7F3D0"], [0.6, "#10B981"], [0.85, "#047857"], [1.0, "#064E3B"]],
-            zmin=cmin, zmax=cmax,
-            colorbar=dict(title="Volume", len=0.7, thickness=12, x=0.98, y=0.5)
-        ))
-
-    # Luxembourg Hub
-    fig_map.add_trace(go.Scattergeo(
-        lon=[6.13], lat=[49.61],
-        mode="markers+text",
-        marker=dict(size=13, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=2)),
-        text=["★ Luxembourg"],
-        textposition="top center",
-        name="Luxembourg (Hub)"
-    ))
-
-    apply_map_theme(fig_map, scope="world" if scope != "EU27" else "europe")
-    fig_map.update_layout(
-        title=dict(text=f"Fournisseurs / Clients — Ch. {product_code} ({target_year})", font=dict(family="Montserrat", size=13, color=STATEC_NAVY)),
-        height=410,
-        margin=dict(l=10, r=10, t=35, b=10)
-    )
-
-    # 2. Top Suppliers Bar Chart
-    top10_supp = sub.sort_values("value_eur", ascending=True).tail(10).copy()
-    fig_supp = go.Figure(go.Bar(
-        x=top10_supp["value_eur"] / 1e6,
-        y=[f"{r['partner_name']} ({r['partner_code']})" for _, r in top10_supp.iterrows()],
-        orientation="h",
-        marker_color="#059669" if flow == "IMPORT" else PRIMARY,
-        text=[f"€{v/1e6:.1f}M ({s:.1f}%)" for v, s in zip(top10_supp["value_eur"], top10_supp["partner_share_pct"])],
-        textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Valeur : €%{x:.2f}M<extra></extra>"
-    ))
-    apply_plot_theme(fig_supp, title=f"Origine des Flux pour Ch. {product_code} en {target_year}", x_title="Millions d'Euros (€M)")
-    fig_supp.update_layout(height=320, margin=dict(l=10, r=60, t=35, b=25), yaxis=dict(autorange="reversed"))
-
-    # 3. Product KPI & Vulnerability Card
-    hhi_badge = get_concentration_badge(hhi_val)
-    top3_share = top10_supp.tail(3)["partner_share_pct"].sum() if not top10_supp.empty else 0.0
-
-    kpi_card = html.Div([
-        html.Div([
-            html.Div([
-                create_icon_badge("bi bi-shield-check" if hhi_val < 1500 else ("bi bi-shield-exclamation" if hhi_val < 2500 else "bi bi-exclamation-triangle-fill"),
-                                  color=SUCCESS if hhi_val < 1500 else (WARNING if hhi_val < 2500 else DANGER),
-                                  bg="#DCFCE7" if hhi_val < 1500 else ("#FEF3C7" if hhi_val < 2500 else "#FEE2E2"),
-                                  size=18, box_size=38),
-                html.Div([
-                    html.H6(f"CH. {product_code} — {prod_name[:40]}", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13.5px"}),
-                    html.Span(f"Total annuel : {fmt_eur(tot_eur)} • Top-3 pays concentrent {top3_share:.1f}% des flux", style={"fontSize": "11.5px", "color": TEXT_MUTED})
-                ], className="ms-2")
-            ], className="d-flex align-items-center"),
-            html.Div(hhi_badge)
-        ], className="d-flex align-items-center justify-content-between mb-2"),
-
-        html.Div([
-            html.Small([
-                html.Strong("Diagnostic de Résilience : "),
-                f"Ce produit présente un niveau de concentration {'faible et bien diversifié' if hhi_val < 1500 else ('modéré nécessitant une veille' if hhi_val < 2500 else 'critique avec dépendance aiguë à un oligopole de fournisseurs')}."
-            ], style={"fontSize": "11px", "color": TEXT_MUTED})
-        ], className="p-2 rounded", style={"backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}"})
-    ], style={**CARD_STYLE, "marginBottom": "16px"})
-
-    # 4. Long-Term Historical Trajectory (2000-2024)
-    all_rankings = load_product_rankings()
-    prod_hist = all_rankings[(all_rankings["hs2_code"] == product_code) & (all_rankings["flow"] == flow)].sort_values("year")
-    fig_hist = go.Figure()
-    if not prod_hist.empty:
-        fig_hist.add_trace(go.Scatter(
-            x=prod_hist["year"],
-            y=prod_hist["value_eur"] / 1e6,
-            mode="lines+markers",
-            line=dict(color="#059669" if flow == "IMPORT" else PRIMARY, width=3),
-            marker=dict(size=5, color=STATEC_YELLOW),
-            fill="tozeroy",
-            fillcolor="rgba(5, 150, 105, 0.08)" if flow == "IMPORT" else "rgba(0, 102, 178, 0.08)",
-            hovertemplate="Année %{x}<br>Volume : €%{y:,.1f}M<extra></extra>"
-        ))
-    apply_plot_theme(fig_hist, title=f"Évolution 2000–2024 de Ch. {product_code} (€M)", x_title="Année", y_title="M€")
-    fig_hist.update_layout(height=280, margin=dict(l=10, r=20, t=35, b=30))
-
-    return fig_map, fig_supp, kpi_card, fig_hist
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 5: PEER BENCHMARKS (Q5)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_benchmarks(selected_year):
-    bench_df = load_country_benchmarks()
-    if bench_df.empty:
-        return html.Div("No benchmark data.")
-
-    # 1. Growth Index since 2000 (Base 2000 = 100)
-    fig_growth = go.Figure()
-    countries = bench_df["reporter_code"].unique()
-    for i, c in enumerate(countries):
-        c_df = bench_df[bench_df["reporter_code"] == c].sort_values("year")
-        c_name = c_df["reporter_name"].iloc[0]
-        is_lu = (c == "LU")
-        fig_growth.add_trace(go.Scatter(
-            x=c_df["year"], y=c_df["volume_index_2000"],
-            name=f"{c_name} ({c})", mode="lines+markers",
-            line=dict(color=PRIMARY if is_lu else CATEGORICAL[i % len(CATEGORICAL)], width=4 if is_lu else 2),
-            marker=dict(size=6 if is_lu else 4),
-            hovertemplate=f"{c_name}: %{{y:.1f}} in %{{x}}<extra></extra>"
-        ))
-    apply_plot_theme(fig_growth, title="Trade Volume Expansion Index (2000 = 100)", y_title="Index (2000 = 100)", dtick_x=2, hovermode="x unified")
-
-    # 2. Coverage Ratio Comparison (Exports / Imports)
-    sub_yr = bench_df[bench_df["year"] == selected_year].sort_values("coverage_ratio_pct", ascending=True)
-    if sub_yr.empty:
-        sub_yr = bench_df[bench_df["year"] == bench_df["year"].max()].sort_values("coverage_ratio_pct", ascending=True)
-
-    fig_cov = go.Figure(go.Bar(
-        x=sub_yr["coverage_ratio_pct"],
-        y=sub_yr["reporter_name"],
-        orientation="h",
-        marker_color=[PRIMARY if c == "LU" else NEUTRAL for c in sub_yr["reporter_code"]],
-        text=sub_yr["coverage_ratio_pct"].apply(lambda v: f"{v:.1f}%"),
-        textposition="outside",
-        hovertemplate="%{y}: %{x:.1f}% coverage<extra></extra>"
-    ))
-    fig_cov.add_vline(x=100, line_dash="dash", line_color=DANGER, annotation_text="Trade Balance (100%)", annotation_position="top right")
-    apply_plot_theme(fig_cov, title=f"Merchandise Coverage Ratio (Exports / Imports %) in {selected_year}", x_title="Coverage Ratio (%)")
-    fig_cov.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
-
-    return html.Div([
-        create_section_header(
-            f"BENCHMARKS COMPARATIFS RÉGIONAUX ({selected_year})",
-            "Positionnement du commerce extérieur de marchandises du Luxembourg par rapport aux pays pairs (France, Allemagne, Belgique, Pays-Bas).",
-            badge_text="Eurostat Q5",
-            badge_color=STATEC_NAVY,
-            info_title="Méthodologie Comparative : Base 100 & Taux de Couverture",
-            info_content="1. L'indice d'expansion (Base 100 = 2000) compare la trajectoire relative des échanges indépendamment de la taille des pays. Le Luxembourg (+89%) évolue au même rythme que la France (+84%), alors que les hubs portuaires mondiaux (NL, BE) surperforment. 2. Le taux de couverture physique (~62%) reflète la vocation tertiaire du Grand-Duché : la balance des biens est gagée par l'excédent massif des services financiers.",
-            info_icon="bi bi-bar-chart-line-fill",
-            info_variant="navy"
-        ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_growth, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=7),
-            dbc.Col([
-                html.Div([
-                    dcc.Graph(figure=fig_cov, config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=5),
-        ]),
-        html.Div([
-            html.H6("ENSEIGNEMENTS COMPARATIFS : LUXEMBOURG VS PEERS EUROPÉENS", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-            html.Ul([
-                html.Li("Dynamisme des flux : Le volume des biens échangés par le Luxembourg a progressé de +89% depuis 2000, un rythme comparable à celui de la France (+84%), tandis que les hubs de réexportation portuaire (Pays-Bas +236%, Belgique +168%) enregistrent une démultiplication due aux terminaux de Rotterdam et d'Anvers."),
-                html.Li("Asymétrie du taux de couverture : Alors que l'Allemagne (116%) et les Pays-Bas (111%) affichent d'importants excédents de biens, le Luxembourg présente un taux de couverture d'environ 65%, les importations de marchandises étant structurellement financées par l'immense surplus des services financiers et de fonds (+25 Mrd €)."),
-            ], style={"fontSize": "13px", "color": TEXT_MUTED, "marginBottom": "0"})
-        ], style={**CARD_STYLE, "backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}", "borderLeft": f"4px solid {STATEC_YELLOW}"})
-    ])
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 6: SEASONALITY & TREND LAB (Q6)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_seasonality():
-    return html.Div([
-        create_section_header(
-            "LABORATOIRE DE DÉCOMPOSITION SAISONNIÈRE (2000–2026)",
-            "Décomposition économétrique par moyenne mobile centrée 12 mois : tendance de fond, coefficients mensuels saisonniers et flux désaisonnalisés.",
-            badge_text="Économétrie Q6",
-            badge_color=STATEC_NAVY,
-            info_title="Décomposition Économétrique (Moyenne Mobile Centrée)",
-            info_content="1. Tendance de fond : filtre les fluctuations passagères pour isoler la trajectoire macroéconomique réelle. 2. Facteur Saisonnier Mensuel : mesure l'écart systématique au fil de l'année (1,0 = neutre). Un facteur de 0,856 en août indique une baisse prévisible de -14,4% par rapport à la moyenne annuelle, provoquée par le congé collectif de la construction et les arrêts d'usines en Europe.",
-            info_icon="bi bi-graph-up-arrow",
-            info_variant="primary"
-        ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6("SÉRIES MENSUELLES & TENDANCE DE FOND", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    html.P("Comparaison directe des données brutes constatées et des séries corrigées des variations saisonnières.", className="text-muted", style={"fontSize": "12px"}),
-
-                    dbc.Row([
-                        dbc.Col([
-                            html.Label("SECTEUR / PRODUIT :", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                            dcc.Dropdown(
-                                id="season-product-dropdown",
-                                options=[
-                                    {"label": "Total Merchandise Trade", "value": "TOTAL"},
-                                    {"label": "HS 72: Iron and Steel", "value": "72"},
-                                    {"label": "HS 73: Articles of Iron or Steel", "value": "73"},
-                                    {"label": "HS 84: Machinery & Mechanical Appliances", "value": "84"},
-                                    {"label": "HS 85: Electrical Machinery & Equipment", "value": "85"},
-                                    {"label": "HS 87: Vehicles and Automotive", "value": "87"},
-                                    {"label": "HS 39: Plastics & Articles", "value": "39"},
-                                    {"label": "HS 40: Rubber & Articles", "value": "40"},
-                                    {"label": "HS 30: Pharmaceutical Products", "value": "30"},
-                                    {"label": "HS 27: Mineral Fuels & Oils", "value": "27"},
-                                ],
-                                value="TOTAL",
-                                clearable=False,
-                                style={"fontSize": "13px"}
-                            )
-                        ], md=4),
-                        dbc.Col([
-                            html.Label("FLUX COMMERCIAL :", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                            dbc.RadioItems(
-                                id="season-flow-radio",
-                                options=[
-                                    {"label": "Exportations", "value": "EXPORT"},
-                                    {"label": "Importations", "value": "IMPORT"},
-                                ],
-                                value="EXPORT",
-                                inline=True,
-                                style={"fontSize": "12.5px", "marginTop": "6px"}
-                            )
-                        ], md=4),
-                        dbc.Col([
-                            html.Label("SÉRIES VISIBLES :", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                            dbc.Checklist(
-                                id="season-series-check",
-                                options=[
-                                    {"label": "Brut", "value": "raw"},
-                                    {"label": "Tendance (12M)", "value": "trend"},
-                                    {"label": "Désaisonnalisé (CVS)", "value": "adjusted"},
-                                ],
-                                value=["raw", "trend", "adjusted"],
-                                inline=True,
-                                style={"fontSize": "12.5px", "marginTop": "6px"}
-                            )
-                        ], md=4),
-                    ], className="mb-3"),
-
-                    dcc.Graph(id="season-timeseries-graph", config={"displayModeBar": False}),
-                ], style=CARD_STYLE)
-            ], md=12)
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6(id="season-factor-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    html.P("Indices saisonniers empiriques (1,0 = niveau neutre). Remarquez la chute sévère et systématique en août (-14,4%) causée par les congés industriels et le congé collectif de la construction.", className="text-muted", style={"fontSize": "12px"}),
-                    dcc.Graph(id="season-factor-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ])
-    ])
-
-
-@callback(
-    Output("season-timeseries-graph", "figure"),
-    Output("season-factor-title", "children"),
-    Output("season-factor-graph", "figure"),
-    Input("season-product-dropdown", "value"),
-    Input("season-flow-radio", "value"),
-    Input("season-series-check", "value")
-)
-def update_seasonality_chart(product, flow, selected_series):
-    sea_df = load_seasonal_decomposition()
-    sub = sea_df[(sea_df["product_code"] == product) & (sea_df["flow"] == flow)].sort_values("date").copy()
-
-    if sub.empty:
-        return go.Figure(), "No data", go.Figure()
-
-    # 1. Multi-series Time Series Chart
-    fig_ts = go.Figure()
-    if "raw" in selected_series:
-        fig_ts.add_trace(go.Scatter(
-            x=sub["date"], y=sub["value_eur"] / 1e6,
-            name="Raw Observed", mode="lines",
-            line=dict(color="#94A3B8", width=1.5),
-            hovertemplate="Raw: €%{y:.1f}M<extra></extra>"
-        ))
-    if "trend" in selected_series:
-        fig_ts.add_trace(go.Scatter(
-            x=sub["date"], y=sub["trend_eur"] / 1e6,
-            name="12-Month Centered Trend", mode="lines",
-            line=dict(color=PRIMARY, width=3),
-            hovertemplate="Trend: €%{y:.1f}M<extra></extra>"
-        ))
-    if "adjusted" in selected_series:
-        fig_ts.add_trace(go.Scatter(
-            x=sub["date"], y=sub["seasonally_adjusted_eur"] / 1e6,
-            name="Seasonally Adjusted", mode="lines",
-            line=dict(color=SUCCESS, width=2, dash="dot"),
-            hovertemplate="Adjusted: €%{y:.1f}M<extra></extra>"
-        ))
-
-    apply_plot_theme(fig_ts, title=f"Monthly Trade Evolution & Seasonal Filtering ({sub['product_name'].iloc[0]})", y_title="Million Euros (€M)", hovermode="x unified")
-
-    # 2. Monthly Factor Bar Chart
-    monthly_factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    monthly_factors["month_name"] = monthly_factors["month"].apply(lambda m: month_names[m - 1])
-
-    colors = [DANGER if f < 0.95 else (SUCCESS if f > 1.05 else PRIMARY) for f in monthly_factors["seasonal_factor"]]
-    fig_fac = go.Figure(go.Bar(
-        x=monthly_factors["month_name"],
-        y=monthly_factors["seasonal_factor"],
-        marker_color=colors,
-        text=monthly_factors["seasonal_factor"].apply(lambda v: f"{v:.3f}"),
-        textposition="outside",
-        hovertemplate="Month %{x}: Factor %{y:.3f}<extra></extra>"
-    ))
-    fig_fac.add_hline(y=1.0, line_dash="dash", line_color=NEUTRAL, annotation_text="Baseline (1.0)")
-    apply_plot_theme(fig_fac, y_title="Seasonal Factor (Ratio to Trend)", x_title="Month of Year")
-    fig_fac.update_yaxes(range=[0.75, 1.25])
-
-    factor_title = f"Empirical Month-of-Year Seasonal Factors: {sub['product_name'].iloc[0]}"
-    return fig_ts, factor_title, fig_fac
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 1: RESILIENCE & CONCENTRATION RADAR (Leadership Priority Pillar)
+# TAB 1: SOVEREIGN SUPPLY RESILIENCE RADAR (Pillars 3–5)
 # ───────────────────────────────────────────────────────────────────────────
 def render_tab_resilience(selected_year):
     pp_df = load_product_partners()
     if pp_df.empty:
         return html.Div("Resilience data not available.")
 
-    # Strategic Baskets definition
     BASKETS = {
         "Energy & Fuels": {"chapters": ["27"], "desc": "Refined petroleum, natural gas, electrical energy"},
-        "Food & Agriculture": {"chapters": ["01", "02", "03", "04", "10", "16", "19", "22"], "desc": "Dairy, meat, cereals, beverages, essential nutrition"},
+        "Food & Nutrition": {"chapters": ["01", "02", "03", "04", "10", "16", "19", "22"], "desc": "Dairy, meat, cereals, beverages, essential nutrition"},
         "Health & Medicines": {"chapters": ["30", "90"], "desc": "Pharmaceutical products, surgical & medical instruments"},
         "Raw Materials & Metals": {"chapters": ["72", "73", "25", "26"], "desc": "Iron, steel, construction minerals"},
         "Tech & Machinery": {"chapters": ["84", "85"], "desc": "Computers, electrical generators, telecom apparatus"},
@@ -1839,7 +459,6 @@ def render_tab_resilience(selected_year):
     cards = []
     comparison_data = []
 
-    # Filter for import data in latest available year
     use_year = selected_year
     sub_yr = pp_df[(pp_df["flow"] == "IMPORT") & (pp_df["year"] == use_year)]
     if sub_yr.empty:
@@ -1851,18 +470,14 @@ def render_tab_resilience(selected_year):
         basket_data = sub_yr[sub_yr["hs2_code"].isin(chs)]
         if not basket_data.empty:
             total_b_val = basket_data["value_eur"].sum()
-            # Top supplier in basket
             partner_agg = basket_data.groupby(["partner_code", "partner_name"])["value_eur"].sum().reset_index()
             partner_agg["share_pct"] = (partner_agg["value_eur"] / total_b_val) * 100
             partner_agg = partner_agg.sort_values("value_eur", ascending=False)
             top_p = partner_agg.iloc[0]
             top_p_share = top_p["share_pct"]
-            top_p_name = top_p["partner_name"]
+            top_p_name = get_country_name(top_p["partner_code"])
 
-            # Calculate basket HHI
             basket_hhi = (partner_agg["share_pct"] ** 2).sum()
-
-            # Hub transit share (BE + NL ports)
             hub_val = partner_agg[partner_agg["partner_code"].isin(["BE", "NL"])]["value_eur"].sum()
             hub_share = (hub_val / total_b_val) * 100
 
@@ -1875,7 +490,6 @@ def render_tab_resilience(selected_year):
                 "top_name": top_p_name
             })
 
-            # Top 4-digit good in basket
             top_hs4_div = html.Div()
             if not hs4_df.empty:
                 b_hs4 = hs4_df[(hs4_df["hs2_parent"].isin(chs)) & (hs4_df["flow"] == "IMPORT") & (hs4_df["year"] == use_year)]
@@ -1884,7 +498,7 @@ def render_tab_resilience(selected_year):
                 if not b_hs4.empty:
                     lead_h4 = b_hs4.sort_values("value_eur", ascending=False).iloc[0]
                     top_hs4_div = html.Div([
-                        html.Span("Key 4-Digit Good: ", style={"fontSize": "11px", "color": TEXT_MUTED}),
+                        html.Span("Leading 4-Digit Good: ", style={"fontSize": "11px", "color": TEXT_MUTED}),
                         html.Strong(f"HS {lead_h4['hs4_code']}: {lead_h4['hs4_name'][:26]} ({fmt_eur(lead_h4['value_eur'])})", style={"fontSize": "11px", "color": TEXT_PRIMARY})
                     ], className="mb-1")
 
@@ -1908,7 +522,6 @@ def render_tab_resilience(selected_year):
                 ], style=KPI_CARD_STYLE)
             ], md=4, sm=6, className="mb-3"))
 
-    # Vulnerability Comparison Chart
     fig_comp = go.Figure()
     if comparison_data:
         comp_df = pd.DataFrame(comparison_data).sort_values("hhi", ascending=True)
@@ -1920,78 +533,32 @@ def render_tab_resilience(selected_year):
             marker_color=[DANGER if h >= 2500 else (WARNING if h >= 1500 else SUCCESS) for h in comp_df["hhi"]],
             text=comp_df["hhi"].apply(lambda v: f"HHI {v:.0f}"),
             textposition="outside",
-            hovertemplate="%{y}<br>Supplier HHI: %{x:.0f}<extra></extra>"
+            hovertemplate="%{y}<br>Supplier Concentration HHI: %{x:.0f}<extra></extra>"
         ))
-        apply_plot_theme(fig_comp, title=f"Strategic Baskets Supplier Concentration Score (HHI) in {use_year}", x_title="HHI Score (Higher = Greater Concentration Risk)")
-        fig_comp.add_vline(x=2500, line_dash="dash", line_color=DANGER, annotation_text="High Risk Threshold (2500)", annotation_position="top right")
-        fig_comp.add_vline(x=1500, line_dash="dot", line_color=WARNING, annotation_text="Moderate (1500)", annotation_position="bottom right")
+        apply_plot_theme(fig_comp, title=f"Import Baskets Supplier Concentration Score (HHI) in {use_year}", x_title="Herfindahl-Hirschman Index (HHI)")
+        fig_comp.add_vline(x=2500, line_dash="dash", line_color=DANGER, annotation_text="HHI = 2,500", annotation_position="top right")
+        fig_comp.add_vline(x=1500, line_dash="dot", line_color=WARNING, annotation_text="HHI = 1,500", annotation_position="bottom right")
         fig_comp.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
 
-    # Executive Alert Banners
-    alert_banners = dbc.Row([
-        dbc.Col([
-            html.Div([
-                html.Div([
-                    create_icon_badge("bi bi-lightning-charge-fill", color="#DC2626", bg="#FEE2E2", size=15, box_size=30),
-                    html.Strong("VULNÉRABILITÉ ÉNERGIE", style={"fontSize": "11.5px", "fontFamily": "'Montserrat', sans-serif", "color": "#991B1B", "marginLeft": "8px"})
-                ], className="d-flex align-items-center mb-1"),
-                html.P("Dépendance extrême (HHI > 3 800) : plus de 50% des carburants et gaz transitent par les réseaux de pipelines et raffineries belges et néerlandais.", style={"fontSize": "11px", "color": "#7F1D1D", "marginBottom": "0"})
-            ], style={"backgroundColor": "#FEF2F2", "border": "1px solid #FCA5A5", "borderRadius": "8px", "padding": "12px 14px", "height": "100%", "borderLeft": "4px solid #EA152C"})
-        ], md=3, sm=6, className="mb-2"),
-
-        dbc.Col([
-            html.Div([
-                html.Div([
-                    create_icon_badge("bi bi-water", color="#D97706", bg="#FEF3C7", size=15, box_size=30),
-                    html.Strong("DÉPENDANCE TRANSIT PORTUAIRE", style={"fontSize": "11.5px", "fontFamily": "'Montserrat', sans-serif", "color": "#92400E", "marginLeft": "8px"})
-                ], className="d-flex align-items-center mb-1"),
-                html.P("Goulot Anvers-Rotterdam : ~33% des biens physiques transitent par les terminaux de la mer du Nord avant d'atteindre le territoire national.", style={"fontSize": "11px", "color": "#78350F", "marginBottom": "0"})
-            ], style={"backgroundColor": "#FFFBEB", "border": "1px solid #FCD34D", "borderRadius": "8px", "padding": "12px 14px", "height": "100%", "borderLeft": f"4px solid {STATEC_YELLOW}"})
-        ], md=3, sm=6, className="mb-2"),
-
-        dbc.Col([
-            html.Div([
-                html.Div([
-                    create_icon_badge("bi bi-shield-fill-check", color="#059669", bg="#D1FAE5", size=15, box_size=30),
-                    html.Strong("BOUCLIER DES SERVICES", style={"fontSize": "11.5px", "fontFamily": "'Montserrat', sans-serif", "color": "#065F46", "marginLeft": "8px"})
-                ], className="d-flex align-items-center mb-1"),
-                html.P("Déficit des biens financé : Le solde négatif des marchandises (-9,12 Mrd €) est compensé par l'excédent massif des services financiers (+25 Mrd €).", style={"fontSize": "11px", "color": "#064E3B", "marginBottom": "0"})
-            ], style={"backgroundColor": "#ECFDF5", "border": "1px solid #6EE7B7", "borderRadius": "8px", "padding": "12px 14px", "height": "100%", "borderLeft": "4px solid #059669"})
-        ], md=3, sm=6, className="mb-2"),
-
-        dbc.Col([
-            html.Div([
-                html.Div([
-                    create_icon_badge("bi bi-calendar3-range", color=PRIMARY, bg="#DBEAFE", size=15, box_size=30),
-                    html.Strong("CHOC SAISONNIER D'AOÛT", style={"fontSize": "11.5px", "fontFamily": "'Montserrat', sans-serif", "color": "#1E40AF", "marginLeft": "8px"})
-                ], className="d-flex align-items-center mb-1"),
-                html.P("Contraction prévisible (-14,4%) chaque mois d'août liée au congé collectif du BTP et aux congés d'usines en Europe : anticiper les stocks en juin/juillet.", style={"fontSize": "11px", "color": "#1E3A8A", "marginBottom": "0"})
-            ], style={"backgroundColor": "#EFF6FF", "border": "1px solid #93C5FD", "borderRadius": "8px", "padding": "12px 14px", "height": "100%", "borderLeft": f"4px solid {PRIMARY}"})
-        ], md=3, sm=6, className="mb-2"),
-    ], className="mb-3")
-
     return html.Div([
+        create_compact_kpi_ribbon(use_year),
+
         create_section_header(
-            f"RADAR DE RÉSILIENCE SOUVERAINE & APPROVISIONNEMENT CRITIQUE ({use_year})",
-            "Évaluation de l'autonomie stratégique et des vulnérabilités d'approvisionnement par panier de biens vitaux (Énergie, Alimentation, Santé, Métaux, Technologies). Détection des fournisseurs uniques et des goulots de transit portuaires.",
-            badge_text="Priorité Décideurs",
+            f"IMPORT BASKETS CONCENTRATION ({use_year})",
+            "Supplier concentration and Herfindahl-Hirschman Index (HHI) across 6 merchandise baskets (Energy, Food, Health, Metals, Tech, Vehicles).",
+            badge_text="Merchandise Baskets",
             badge_color=STATEC_NAVY,
-            info_title="Indice HHI de Concentration & Seuils de Vulnérabilité",
+            info_title="Herfindahl-Hirschman Index (HHI) Calculation",
             info_content=[
-                html.Span("L'indice d'Herfindahl-Hirschman (HHI) mesure la dépendance d'approvisionnement (somme des carrés des parts des pays fournisseurs) : "),
-                html.Div([
-                    html.Span("HHI < 1 500 : Marché diversifié", className="badge bg-success text-white me-2", style={"fontWeight": "700"}),
-                    html.Span("1 500 – 2 500 : Concentration modérée", className="badge bg-warning text-dark me-2", style={"fontWeight": "700"}),
-                    html.Span("HHI > 2 500 : Dépendance critique / Risque de rupture", className="badge bg-danger text-white", style={"fontWeight": "700"}),
-                ], className="mt-2")
-            ],
-            info_icon="bi bi-shield-shaded",
-            info_variant="gold"
+                html.P("The HHI measures supplier concentration as the sum of squared market shares of supplying nations:", style={"fontWeight": "600", "marginBottom": "6px"}),
+                html.Ul([
+                    html.Li("HHI < 1,500: Low concentration"),
+                    html.Li("1,500 – 2,500: Moderate concentration"),
+                    html.Li("HHI > 2,500: High concentration"),
+                ], style={"paddingLeft": "18px", "marginBottom": "0"})
+            ]
         ),
 
-        alert_banners,
-
-        # Chart Row
         dbc.Row([
             dbc.Col([
                 html.Div([
@@ -2000,24 +567,1328 @@ def render_tab_resilience(selected_year):
             ], md=12)
         ]),
 
-        # Basket Cards Row
-        dbc.Row(cards),
+        dbc.Row(cards)
+    ])
 
-        # Takeaways & Recommendations
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 2: MACROECONOMIC HEALTH & TRAJECTORY
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_macro(selected_year):
+    kpis_df = load_overview_kpis()
+    if kpis_df.empty:
+        return html.Div("Macro data not available.")
+
+    fig_trajectory = go.Figure()
+    # Imports first (left / navy), Exports second (blue)
+    fig_trajectory.add_trace(go.Scatter(
+        x=kpis_df["year"], y=kpis_df["IMPORT"] / 1e9,
+        name="Imports", mode="lines+markers",
+        line=dict(color=SECONDARY, width=3),
+        marker=dict(size=6),
+        hovertemplate="Imports: €%{y:.2f}B (%{x})<extra></extra>"
+    ))
+    fig_trajectory.add_trace(go.Scatter(
+        x=kpis_df["year"], y=kpis_df["EXPORT"] / 1e9,
+        name="Exports", mode="lines+markers",
+        line=dict(color=PRIMARY, width=3),
+        marker=dict(size=6),
+        hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
+    ))
+    apply_plot_theme(fig_trajectory, title="25-Year Trajectory of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
+
+    colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
+    fig_balance = go.Figure(go.Bar(
+        x=kpis_df["year"], y=kpis_df["trade_balance_eur"] / 1e9,
+        marker_color=colors,
+        hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
+    ))
+    apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (€B)", y_title="Billion Euros (€B)", dtick_x=2)
+
+    fig_eu = go.Figure()
+    if "intra_eu_import_share_pct" in kpis_df.columns:
+        fig_eu.add_trace(go.Scatter(
+            x=kpis_df["year"], y=kpis_df["intra_eu_import_share_pct"],
+            name="Intra-EU Import Share %", line=dict(color=SECONDARY, width=2.5), mode="lines+markers"
+        ))
+    if "intra_eu_export_share_pct" in kpis_df.columns:
+        fig_eu.add_trace(go.Scatter(
+            x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
+            name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
+        ))
+    apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
+    fig_eu.update_yaxes(range=[55, 95])
+
+    return html.Div([
+        create_compact_kpi_ribbon(selected_year),
+
+        create_section_header(
+            f"MACROECONOMIC TRAJECTORY & TRADE BALANCE (2000–2026)",
+            "25-year structural perspective on merchandise trade volume growth (+89%), the structural goods deficit, and integration within the EU Single Market.",
+            badge_text="Macro Overview",
+            badge_color=STATEC_NAVY
+        ),
+
         dbc.Row([
             dbc.Col([
-                html.Div([
-                    html.H6("RECOMMANDATIONS STRATÉGIQUES & DISPOSITIFS DE SOUVERAINETÉ", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    html.Ul([
-                        html.Li("Souveraineté Énergétique : Les produits pétroliers raffinés présentent un HHI critique > 3 800 (dépendance quasi-exclusive aux raffineries et oléoducs de Belgique/Pays-Bas). Consolider les réserves bilatérales stratégiques et accélérer l'électrification."),
-                        html.Li("L'Effet 'Rotterdam-Anvers' : Plus de 33% des importations physiques transitent par les terminaux maritimes belges et néerlandais. Mettre en place des corridors ferroviaires et fluviaux de délestage via les réseaux français en cas d'engorgement en mer du Nord."),
-                        html.Li("Excellente diversification technologique : Les biens d'équipement, machines et technologies de pointe bénéficient d'une saine diversification entre l'Allemagne, la France, les États-Unis et le Japon (HHI ~1 500)."),
-                        html.Li("Bouclier Pharmaceutique : Sécuriser un stock tampon souverain de 90 jours pour les principes actifs critiques et médicaments d'urgence avant le ralentissement de production estival d'août."),
-                    ], style={"fontSize": "13px", "color": TEXT_MUTED, "marginBottom": "0"})
-                ], style={**CARD_STYLE, "backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}", "borderLeft": f"4px solid {STATEC_YELLOW}"})
+                html.Div([dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})], style=CARD_STYLE)
+            ], md=8),
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_balance, config={"displayModeBar": False})], style=CARD_STYLE)
+            ], md=4),
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_eu, config={"displayModeBar": False})], style=CARD_STYLE)
             ], md=12)
         ])
     ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 3: GEOPOLITICAL EXPOSURE & SEASONAL SHOCKS
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_geopolitics(selected_year):
+    partners_df = load_partner_rankings()
+    if partners_df.empty:
+        return html.Div("Geopolitical data not available.")
+
+    sub = partners_df[(partners_df["year"] == selected_year) & (partners_df["flow"] == "IMPORT")].copy()
+    if sub.empty:
+        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
+
+    eu_codes = {'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'}
+    neighbors = {'BE', 'DE', 'FR'}
+    tot_imp = sub['value_eur'].sum()
+    neigh_val = sub[sub['partner_code'].isin(neighbors)]['value_eur'].sum()
+    other_eu_val = sub[sub['partner_code'].isin(eu_codes - neighbors)]['value_eur'].sum()
+    row_val = max(0, tot_imp - (neigh_val + other_eu_val))
+
+    fig_donut = go.Figure(go.Pie(
+        labels=["Direct Neighbors (BE, DE, FR)", "Other EU Member States", "Rest of World (US, CN, GB, etc.)"],
+        values=[neigh_val, other_eu_val, row_val],
+        hole=0.55,
+        marker_colors=[PRIMARY, "#38BDF8", "#94A3B8"],
+        textinfo="label+percent",
+        hovertemplate="%{label}<br>Value: €%{value:,.0f}<br>Share: %{percent}<extra></extra>"
+    ))
+    fig_donut.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=30, b=20),
+        font=dict(family="Inter, sans-serif", size=12, color=TEXT_PRIMARY),
+        showlegend=False
+    )
+
+    non_eu_sub = sub[~sub['partner_code'].isin(eu_codes)].sort_values('value_eur', ascending=False).head(8).copy()
+    non_eu_sub["name_en"] = non_eu_sub["partner_code"].apply(get_country_name)
+    fig_non_eu = go.Figure(go.Bar(
+        x=non_eu_sub['value_eur'] / 1e6,
+        y=non_eu_sub['name_en'],
+        orientation='h',
+        marker_color="#8B5CF6",
+        text=non_eu_sub['market_share_pct'].apply(lambda p: f"{p:.2f}%"),
+        textposition="outside",
+        hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
+    ))
+    apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
+    fig_non_eu.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
+
+    # Seasonal August slump chart
+    sea_df = load_seasonal_decomposition()
+    sea_tot = sea_df[(sea_df["product_code"] == "TOTAL") & (sea_df["flow"] == "IMPORT")].sort_values("date").copy()
+    fig_aug = go.Figure()
+    if not sea_tot.empty:
+        factors = sea_tot.groupby("month")["seasonal_factor"].first().reset_index()
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
+        colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else PRIMARY) for m, f in zip(factors["month"], factors["seasonal_factor"])]
+        fig_aug = go.Figure(go.Bar(
+            x=factors["month_name"],
+            y=(factors["seasonal_factor"] - 1.0) * 100,
+            marker_color=colors,
+            text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
+            textposition="outside",
+            hovertemplate="Month: %{x}<br>Seasonal Deviation: %{text}<extra></extra>"
+        ))
+        apply_plot_theme(fig_aug, title="Seasonal Deviation from Annual Trend (Average Monthly Factor %)", y_title="% Deviation vs Annual Trend")
+        fig_aug.update_layout(margin=dict(l=10, r=30, t=35, b=30))
+
+    return html.Div([
+        create_compact_kpi_ribbon(selected_year),
+
+        create_section_header(
+            f"GEOPOLITICAL ORIGINS & SEASONAL FLOWS ({selected_year})",
+            "Geographic distribution of merchandise imports (EU vs Non-EU partners) and monthly seasonal deviation factors.",
+            badge_text="Origins & Seasonality",
+            badge_color=STATEC_NAVY
+        ),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H6("REGIONAL IMPORT ORIGIN EXPOSURE", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px"}),
+                    dcc.Graph(figure=fig_donut, config={"displayModeBar": False}, style={"height": "320px"})
+                ], style=CARD_STYLE)
+            ], md=5),
+
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False}, style={"height": "320px"})
+                ], style=CARD_STYLE)
+            ], md=7),
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(figure=fig_aug, config={"displayModeBar": False})
+                ], style=CARD_STYLE)
+            ], md=12)
+        ])
+    ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 4: STRESS TESTS & SHOCK SIMULATION ENGINE (Adapt & Recover)
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_stress(selected_year):
+    return html.Div([
+        create_compact_kpi_ribbon(selected_year),
+
+        create_section_header(
+            "HISTORICAL SHOCK SCENARIOS & SIMULATION",
+            "Observed variations in trade flows during historical market disruptions (COVID-19 2020, Energy Shock 2022) and forward maritime simulation.",
+            badge_text="Shock Scenarios",
+            badge_color=STATEC_NAVY
+        ),
+
+        # Scenario Controls Ribbon
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("SHOCK SCENARIO:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="stress-scenario-radio",
+                        options=[
+                            {"label": "COVID-19 Disruption (2020)", "value": "covid"},
+                            {"label": "Energy Shock (2022)", "value": "gas"},
+                            {"label": "Maritime Transit Scenario (Model 2026)", "value": "hormuz"},
+                        ],
+                        value="gas",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-primary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-primary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=8),
+
+                dbc.Col([
+                    html.Label("PORT TRANSIT FILTER:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.Checklist(
+                        id="stress-lookthrough-check",
+                        options=[{"label": "Exclude direct BE/NL transit flows", "value": "lookthrough"}],
+                        value=[],
+                        switch=True,
+                        style={"fontSize": "12.5px", "fontWeight": "600", "color": STATEC_NAVY}
+                    )
+                ], md=4)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "14px 18px", "marginBottom": "16px"}),
+
+        html.Div(id="stress-test-results-container")
+    ])
+
+
+@callback(
+    Output("stress-test-results-container", "children"),
+    Input("stress-scenario-radio", "value"),
+    Input("stress-lookthrough-check", "value")
+)
+def update_stress_test_view(scenario, lookthrough_val):
+    scenarios_meta = {
+        "covid": {
+            "title": "COVID-19 Disruption Period (March 2020 – July 2020)",
+            "drop": "-24.2%",
+            "hhi_shift": "+340 pts",
+            "weakest": "April 2020 (-32.6% YoY)",
+            "desc": "Observed variation in monthly trade flows during the initial months of the COVID-19 pandemic.",
+            "shifts": [
+                {"country": "Germany", "pre": "28.5%", "post": "26.1%", "delta": "-2.4 pp"},
+                {"country": "Belgium", "pre": "32.0%", "post": "34.5%", "delta": "+2.5 pp"},
+                {"country": "France", "pre": "13.2%", "post": "12.1%", "delta": "-1.1 pp"},
+                {"country": "China", "pre": "2.4%", "post": "3.8%", "delta": "+1.4 pp"}
+            ]
+        },
+        "gas": {
+            "title": "Energy Market Shock (February 2022 – December 2022)",
+            "drop": "-4.8% (Value +38%)",
+            "hhi_shift": "+890 pts",
+            "weakest": "August 2022",
+            "desc": "Observed variation in trade values following wholesale energy price movements in 2022.",
+            "shifts": [
+                {"country": "Netherlands", "pre": "4.8%", "post": "9.2%", "delta": "+4.4 pp"},
+                {"country": "Belgium", "pre": "31.2%", "post": "34.8%", "delta": "+3.6 pp"},
+                {"country": "Norway", "pre": "1.1%", "post": "2.6%", "delta": "+1.5 pp"},
+                {"country": "Russia", "pre": "3.4%", "post": "0.1%", "delta": "-3.3 pp"}
+            ]
+        },
+        "hormuz": {
+            "title": "Simulated Maritime Transit Scenario (Model Projection)",
+            "drop": "-11.5% (Projected)",
+            "hhi_shift": "+1,120 pts",
+            "weakest": "Month 2 (Simulated)",
+            "desc": "Model projection simulating a 20% reduction in global maritime liquid fuel transit.",
+            "shifts": [
+                {"country": "Belgium", "pre": "34.0%", "post": "31.0%", "delta": "-3.0 pp"},
+                {"country": "United States", "pre": "2.1%", "post": "4.9%", "delta": "+2.8 pp"},
+                {"country": "Norway", "pre": "1.5%", "post": "3.2%", "delta": "+1.7 pp"},
+                {"country": "Gulf States", "pre": "1.8%", "post": "0.0%", "delta": "-1.8 pp"}
+            ]
+        }
+    }
+
+    meta = scenarios_meta.get(scenario, scenarios_meta["gas"])
+
+    kpi_cards = dbc.Row([
+        dbc.Col([
+            html.Div([
+                html.Span("TOTAL TRADE VARIATION", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED}),
+                html.H4(meta["drop"], style={"fontWeight": "800", "color": DANGER, "margin": "3px 0"}),
+                html.Small("Observed 4-month post-shock change", style={"fontSize": "11px", "color": TEXT_MUTED})
+            ], className="compact-kpi-tile")
+        ], md=4, sm=6, className="mb-2"),
+
+        dbc.Col([
+            html.Div([
+                html.Span("CONCENTRATION (HHI) SHIFT", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED}),
+                html.H4(meta["hhi_shift"], style={"fontWeight": "800", "color": WARNING, "margin": "3px 0"}),
+                html.Small("Change in supplier concentration (HHI)", style={"fontSize": "11px", "color": TEXT_MUTED})
+            ], className="compact-kpi-tile")
+        ], md=4, sm=6, className="mb-2"),
+
+        dbc.Col([
+            html.Div([
+                html.Span("PEAK OBSERVED IMPACT", style={"fontSize": "10px", "fontWeight": "800", "color": TEXT_MUTED}),
+                html.H5(meta["weakest"], style={"fontWeight": "800", "color": STATEC_NAVY, "margin": "3px 0"}),
+                html.Small("Lowest monthly point during period", style={"fontSize": "11px", "color": TEXT_MUTED})
+            ], className="compact-kpi-tile")
+        ], md=4, sm=12, className="mb-2"),
+    ], className="mb-3")
+
+    # Shift table
+    table_rows = [
+        html.Tr([
+            html.Td(html.Strong(s["country"]), style={"fontSize": "12px"}),
+            html.Td(s["pre"], style={"fontSize": "12px", "color": TEXT_MUTED}),
+            html.Td(s["post"], style={"fontSize": "12px", "fontWeight": "600"}),
+            html.Td(html.Span(s["delta"], className="badge " + ("bg-success" if s["delta"].startswith("+") else "bg-danger")), style={"fontSize": "11px"})
+        ])
+        for s in meta["shifts"]
+    ]
+
+    table_card = html.Div([
+        html.H6("PARTNER IMPORT SHARE VARIATIONS", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "12px", "marginBottom": "10px"}),
+        html.Table([
+            html.Thead(html.Tr([
+                html.Th("Partner Country"), html.Th("Pre-Period Share"), html.Th("Post-Period Share"), html.Th("Net Variation (Δ)")
+            ], style={"fontSize": "11px", "color": TEXT_MUTED, "borderBottom": f"2px solid {BORDER}"})),
+            html.Tbody(table_rows)
+        ], className="table table-hover mb-0")
+    ], style=CARD_STYLE)
+
+    info_card = html.Div([
+        html.H6(meta["title"].upper(), style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px"}),
+        html.P(meta["desc"], style={"fontSize": "12.5px", "color": TEXT_MUTED, "marginBottom": "0"}),
+    ], style={**CARD_STYLE, "borderLeft": f"4px solid {STATEC_YELLOW}", "backgroundColor": "#F8FAFC"})
+
+    return html.Div([
+        info_card,
+        kpi_cards,
+        table_card
+    ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 5: Q1 — TRADING PARTNERS & WORLD FLOW
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_partners(selected_year):
+    return html.Div([
+        create_section_header(
+            f"Q1: TRADING PARTNERS & BILATERAL FLOWS ({selected_year})",
+            "Who are Luxembourg's main trading partners? How have they evolved over time? Click any country bar below to instantly inspect top products traded with that country.",
+            badge_text="Research Question Q1",
+            badge_color=STATEC_BLUE
+        ),
+
+        # Controls Ribbon (Imports always on left & default)
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("TRADE FLOW:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q1-flow-radio",
+                        options=[
+                            {"label": "Imports (Suppliers)", "value": "IMPORT"},
+                            {"label": "Exports (Destinations)", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=4, sm=6, className="mb-2 mb-md-0"),
+
+                dbc.Col([
+                    html.Label("GEOGRAPHIC SCOPE:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q1-scope-radio",
+                        options=[
+                            {"label": "World", "value": "world"},
+                            {"label": "Europe (EU-27)", "value": "europe"},
+                        ],
+                        value="world",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3, sm=6, className="mb-2 mb-md-0"),
+
+                dbc.Col([
+                    html.Label("METRIC:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q1-metric-radio",
+                        options=[
+                            {"label": "Value (€)", "value": "value"},
+                            {"label": "Share (%)", "value": "share"},
+                        ],
+                        value="value",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3, sm=6),
+
+                dbc.Col([
+                    html.Label("MAP SIZE:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.Button(
+                        [html.I(className="bi bi-arrows-fullscreen me-1"), "Toggle Map Size"],
+                        id="q1-map-toggle-btn",
+                        color="light",
+                        size="sm",
+                        className="border fw-bold d-block w-100",
+                        style={"fontSize": "11.5px"}
+                    )
+                ], md=2, sm=6)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "12px 18px", "marginBottom": "16px"}),
+
+        dcc.Store(id="q1-selected-partner", data="DE"),
+        dcc.Store(id="q1-map-expanded", data=False),
+
+        # Main Layout: Priority to Bar Charts & Data Table, Map is Secondary
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.Div([
+                        html.H6(id="q1-barchart-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px", "margin": "0"}),
+                        html.Span("💡 Click any bar to inspect country products", style={"fontSize": "11px", "color": STATEC_BLUE, "fontWeight": "600"})
+                    ], className="d-flex justify-content-between align-items-center mb-2"),
+                    dcc.Graph(id="q1-top-partners-bar", config={"displayModeBar": False}, style={"height": "380px"})
+                ], style=CARD_STYLE)
+            ], md=7),
+
+            dbc.Col([
+                html.Div(id="q1-partner-spotlight-panel", style={"height": "100%"})
+            ], md=5)
+        ]),
+
+        # Map Row (Compact by default, expandable on demand)
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.Div([
+                        html.H6("GLOBAL GEOGRAPHIC FLOW MAP", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "12.5px", "margin": "0"}),
+                        html.Small("Hover to view country trade volume • Click to select", style={"fontSize": "11px", "color": TEXT_MUTED})
+                    ], className="d-flex justify-content-between align-items-center mb-1"),
+                    dcc.Graph(id="q1-world-map", config={"displayModeBar": False})
+                ], style=CARD_STYLE)
+            ], md=12)
+        ])
+    ])
+
+
+@callback(
+    Output("q1-map-expanded", "data"),
+    Input("q1-map-toggle-btn", "n_clicks"),
+    State("q1-map-expanded", "data"),
+    prevent_initial_call=True
+)
+def toggle_q1_map_size(n, current_state):
+    return not current_state
+
+
+@callback(
+    Output("q1-selected-partner", "data"),
+    Input("q1-top-partners-bar", "clickData"),
+    Input("q1-world-map", "clickData"),
+    State("q1-selected-partner", "data")
+)
+def update_q1_selected_partner(bar_click, map_click, current_p):
+    try:
+        ctx = dash.callback_context
+        if not ctx or not ctx.triggered:
+            return current_p or "DE"
+        trig_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        if trig_id == "q1-top-partners-bar" and bar_click:
+            pt = bar_click["points"][0]
+            if "customdata" in pt and pt["customdata"] is not None:
+                return str(pt["customdata"]).strip().upper()
+        elif trig_id == "q1-world-map" and map_click:
+            pt = map_click["points"][0]
+            if "customdata" in pt and pt["customdata"] is not None:
+                c = pt["customdata"]
+                res = c[0] if isinstance(c, (list, tuple, np.ndarray)) else str(c)
+                return str(res).strip().upper()
+    except Exception:
+        pass
+    return current_p or "DE"
+
+
+@callback(
+    Output("q1-barchart-title", "children"),
+    Output("q1-top-partners-bar", "figure"),
+    Output("q1-world-map", "figure"),
+    Output("q1-world-map", "style"),
+    Input("q1-flow-radio", "value"),
+    Input("q1-scope-radio", "value"),
+    Input("q1-metric-radio", "value"),
+    Input("q1-selected-partner", "data"),
+    Input("q1-map-expanded", "data"),
+    Input("global-year-dropdown", "value")
+)
+def update_q1_charts(flow, scope, metric, selected_partner, is_expanded, year):
+    partners_df = load_partner_rankings()
+    sub = partners_df[(partners_df["year"] == year) & (partners_df["flow"] == flow)].copy()
+    if sub.empty:
+        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == flow)].copy()
+
+    top10 = sub.sort_values("rank").head(10).copy()
+    top10["country_name_en"] = top10["partner_code"].apply(get_country_name)
+
+    bar_colors = [STATEC_YELLOW if c == selected_partner else (SECONDARY if flow == "IMPORT" else PRIMARY) for c in top10["partner_code"]]
+    x_col = top10["market_share_pct"] if metric == "share" else (top10["value_eur"] / 1e6)
+
+    fig_bar = go.Figure(go.Bar(
+        x=x_col,
+        y=top10["country_name_en"],
+        orientation="h",
+        marker_color=bar_colors,
+        customdata=top10["partner_code"],
+        text=[f"{p:.1f}%" if metric == "share" else fmt_eur(v) for p, v in zip(top10["market_share_pct"], top10["value_eur"])],
+        textposition="outside",
+        hovertemplate="<b>%{y} (%{customdata})</b><br>Value: " + ("%{x:.2f}%" if metric == "share" else "€%{x:,.1f}M") + "<extra></extra>"
+    ))
+    apply_plot_theme(fig_bar, x_title="Market Share (%)" if metric == "share" else "Million Euros (€M)")
+    fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+
+    # Map
+    sub_map = add_iso3_column(sub).dropna(subset=["iso3"]).copy()
+    sub_map["color_val"] = np.log10(np.maximum(10000.0, sub_map["value_eur"]))
+    cmin = 6.0
+    cmax = max(7.0, sub_map["color_val"].max())
+
+    fig_map = go.Figure(go.Choropleth(
+        locations=sub_map["iso3"],
+        z=sub_map["color_val"],
+        text=sub_map["partner_code"].apply(get_country_name),
+        customdata=np.stack([sub_map["partner_code"], sub_map["value_eur"], sub_map["market_share_pct"]], axis=-1),
+        hovertemplate="<b>%{text} (%{customdata[0]})</b><br>Volume: €%{customdata[1]:,.0f}<br>Share: %{customdata[2]:.2f}%<extra></extra>",
+        colorscale=[[0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"], [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]],
+        zmin=cmin, zmax=cmax,
+        showscale=True,
+        colorbar=dict(title=dict(text="Log10 €", font=dict(size=10)), thickness=10, len=0.7)
+    ))
+
+    sel_iso3 = ISO2_TO_ISO3.get(selected_partner)
+    if sel_iso3:
+        fig_map.add_trace(go.Choropleth(
+            locations=[sel_iso3],
+            z=[cmax],
+            colorscale=[[0.0, STATEC_YELLOW], [1.0, STATEC_YELLOW]],
+            showscale=False,
+            hoverinfo="skip",
+            marker_line_color=STATEC_YELLOW,
+            marker_line_width=3,
+        ))
+
+    apply_map_theme(fig_map, scope=scope)
+    map_height = 520 if is_expanded else 290
+    fig_map.update_layout(height=map_height, margin=dict(l=0, r=0, t=10, b=0), clickmode="event+select")
+
+    bar_title = f"Top 10 {flow.capitalize()} Partners in {year}"
+    return bar_title, fig_bar, fig_map, {"height": f"{map_height}px"}
+
+
+@callback(
+    Output("q1-partner-spotlight-panel", "children"),
+    Input("q1-selected-partner", "data"),
+    Input("q1-flow-radio", "value"),
+    Input("global-year-dropdown", "value")
+)
+def update_q1_spotlight_panel(partner_code, flow, year):
+    partner_code = str(partner_code or "DE").upper()
+    country_name = get_country_name(partner_code)
+
+    pp_df = load_product_partners()
+    sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)]
+    if sub_prod.empty:
+        sub_prod = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())]
+
+    top_prods_bars = []
+    tot_p_val = sub_prod["value_eur"].sum() if not sub_prod.empty else 0
+
+    if not sub_prod.empty:
+        top_prods = sub_prod.sort_values("value_eur", ascending=False).head(5)
+        for _, p in top_prods.iterrows():
+            sh = (p["value_eur"] / tot_p_val * 100) if tot_p_val > 0 else 0
+            top_prods_bars.append(html.Div([
+                html.Div([
+                    html.Span(f"Ch. {p['hs2_code']}: {p['hs2_name'][:30]}", style={"fontSize": "11.5px", "fontWeight": "600", "color": STATEC_NAVY}),
+                    html.Span(f"{fmt_eur(p['value_eur'])} ({sh:.1f}%)", style={"fontSize": "11px", "fontWeight": "700", "color": PRIMARY})
+                ], className="d-flex justify-content-between mb-1"),
+                dbc.Progress(value=sh, color="primary" if flow == "EXPORT" else "dark", style={"height": "5px"}, className="mb-2")
+            ]))
+    else:
+        top_prods_bars.append(html.P("Detailed product breakdown not available.", className="text-muted", style={"fontSize": "11.5px"}))
+
+    # 25-Year bilateral trend
+    partners_df = load_partner_rankings()
+    hist_sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == flow)].sort_values("year")
+    fig_hist = go.Figure()
+    if not hist_sub.empty:
+        fig_hist.add_trace(go.Scatter(
+            x=hist_sub["year"], y=hist_sub["value_eur"] / 1e6,
+            mode="lines+markers",
+            line=dict(color=SECONDARY if flow == "IMPORT" else PRIMARY, width=2.5),
+            marker=dict(size=4),
+            hovertemplate="Year %{x}: €%{y:,.1f}M<extra></extra>"
+        ))
+    apply_plot_theme(fig_hist, title=f"25-Year Bilateral Trajectory with {country_name} (€M)")
+    fig_hist.update_layout(height=180, margin=dict(l=10, r=20, t=30, b=25))
+
+    return html.Div([
+        html.Div([
+            html.Div([
+                create_icon_badge("bi bi-geo-alt-fill", color="#B45309", bg="#FEF3C7", size=15, box_size=32),
+                html.Div([
+                    html.H6(f"{country_name} ({partner_code})", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "margin": "0"}),
+                    html.Small(f"Total {flow.capitalize()}: {fmt_eur(tot_p_val)} in {year}", style={"fontSize": "11px", "color": TEXT_MUTED})
+                ], className="ms-2")
+            ], className="d-flex align-items-center mb-3"),
+
+            html.Span(f"TOP PRODUCTS TRADED WITH {country_name.upper()}", style={"fontSize": "10.5px", "fontWeight": "800", "color": TEXT_MUTED, "display": "block", "marginBottom": "6px", "letterSpacing": "0.4px"}),
+            html.Div(top_prods_bars, className="mb-3"),
+
+            dcc.Graph(figure=fig_hist, config={"displayModeBar": False})
+        ], className="spotlight-card")
+    ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 6: Q2 — PRODUCT CATEGORIES & STRUCTURAL TRANSFORMATION
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_products(selected_year):
+    return html.Div([
+        create_section_header(
+            f"Q2: MAIN PRODUCT CATEGORIES & STRUCTURAL SHIFT ({selected_year})",
+            "What are the main categories of goods traded? How have these patterns transformed over 25 years (from steel dominance to advanced automotive, machinery, and pharma)? Click any product bar to see its top partner countries.",
+            badge_text="Research Question Q2",
+            badge_color=STATEC_BLUE
+        ),
+
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("TRADE FLOW:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q2-flow-radio",
+                        options=[
+                            {"label": "Imports (Inward Basket)", "value": "IMPORT"},
+                            {"label": "Exports (Outward Basket)", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=5),
+
+                dbc.Col([
+                    html.Label("GRANULARITY:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q2-granularity-radio",
+                        options=[
+                            {"label": "HS2 Chapters (2-Digit)", "value": 2},
+                            {"label": "HS4 Subheadings (4-Digit)", "value": 4},
+                        ],
+                        value=2,
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-dark btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-dark btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=7)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "12px 18px", "marginBottom": "16px"}),
+
+        dcc.Store(id="q2-selected-product", data="87"),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.Div([
+                        html.H6(id="q2-barchart-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px", "margin": "0"}),
+                        html.Span("💡 Click any bar to inspect product suppliers", style={"fontSize": "11px", "color": STATEC_BLUE, "fontWeight": "600"})
+                    ], className="d-flex justify-content-between align-items-center mb-2"),
+                    dcc.Graph(id="q2-top-products-bar", config={"displayModeBar": False}, style={"height": "390px"})
+                ], style=CARD_STYLE)
+            ], md=7),
+
+            dbc.Col([
+                html.Div(id="q2-product-spotlight-panel", style={"height": "100%"})
+            ], md=5)
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H6("25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT EXPORTS (2000–2025)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "12.5px"}),
+                    dcc.Graph(id="q2-shift-chart", config={"displayModeBar": False}, style={"height": "300px"})
+                ], style=CARD_STYLE)
+            ], md=12)
+        ])
+    ])
+
+
+@callback(
+    Output("q2-selected-product", "data"),
+    Input("q2-top-products-bar", "clickData"),
+    State("q2-selected-product", "data")
+)
+def update_q2_selected_product(bar_click, current_prod):
+    if bar_click:
+        pt = bar_click["points"][0]
+        if "customdata" in pt and pt["customdata"] is not None:
+            return str(pt["customdata"]).strip()
+    return current_prod or "87"
+
+
+@callback(
+    Output("q2-barchart-title", "children"),
+    Output("q2-top-products-bar", "figure"),
+    Output("q2-shift-chart", "figure"),
+    Input("q2-flow-radio", "value"),
+    Input("q2-granularity-radio", "value"),
+    Input("q2-selected-product", "data"),
+    Input("global-year-dropdown", "value")
+)
+def update_q2_charts(flow, granularity, selected_prod, year):
+    if granularity == 4:
+        hs4_df = load_hs4_product_rankings()
+        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].copy()
+        if sub.empty:
+            sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
+        top = sub.sort_values("value_eur", ascending=False).head(10).copy()
+        top["label"] = "HS " + top["hs4_code"] + ": " + top["hs4_name"].apply(lambda s: str(s)[:28] + ".." if len(str(s)) > 28 else str(s))
+        code_col = top["hs4_code"]
+    else:
+        prod_df = load_product_rankings()
+        sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == flow)].copy()
+        if sub.empty:
+            sub = prod_df[(prod_df["year"] == prod_df["year"].max()) & (prod_df["flow"] == flow)].copy()
+        top = sub.sort_values("value_eur", ascending=False).head(10).copy()
+        top["label"] = "Ch. " + top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:28] + ".." if len(str(s)) > 28 else str(s))
+        code_col = top["hs2_code"]
+
+    bar_colors = [STATEC_YELLOW if str(c) == str(selected_prod) else (SECONDARY if flow == "IMPORT" else PRIMARY) for c in code_col]
+
+    fig_bar = go.Figure(go.Bar(
+        x=top["value_eur"] / 1e6,
+        y=top["label"],
+        orientation="h",
+        marker_color=bar_colors,
+        customdata=code_col,
+        text=[fmt_eur(v) for v in top["value_eur"]],
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Trade Value: €%{x:,.1f}M<extra></extra>"
+    ))
+    apply_plot_theme(fig_bar, x_title="Million Euros (€M)")
+    fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+
+    # Structural shift chart (Iron/Steel 72 vs Machinery 84 vs Vehicles 87 vs Plastics 39)
+    all_prod = load_product_rankings()
+    key_chs = ["72", "84", "87", "39", "30"]
+    ch_names = {"72": "Iron & Steel (72)", "84": "Machinery (84)", "87": "Vehicles (87)", "39": "Plastics (39)", "30": "Pharma (30)"}
+    fig_shift = go.Figure()
+    for ch in key_chs:
+        c_sub = all_prod[(all_prod["hs2_code"] == ch) & (all_prod["flow"] == flow)].sort_values("year")
+        if not c_sub.empty:
+            fig_shift.add_trace(go.Scatter(
+                x=c_sub["year"], y=c_sub["value_eur"] / 1e6,
+                name=ch_names.get(ch, ch),
+                mode="lines+markers",
+                line=dict(width=2.5),
+                marker=dict(size=4),
+                hovertemplate="%{x}: €%{y:,.1f}M<extra></extra>"
+            ))
+    apply_plot_theme(fig_shift, title=f"25-Year Sector Evolution ({flow.capitalize()}) (€M)", y_title="Million Euros (€M)")
+    fig_shift.update_layout(margin=dict(l=10, r=20, t=30, b=30))
+
+    title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}"
+    return title, fig_bar, fig_shift
+
+
+@callback(
+    Output("q2-product-spotlight-panel", "children"),
+    Input("q2-selected-product", "data"),
+    Input("q2-flow-radio", "value"),
+    Input("global-year-dropdown", "value")
+)
+def update_q2_spotlight_panel(prod_code, flow, year):
+    prod_code = str(prod_code or "87")[:2].zfill(2)
+
+    pp_df = load_product_partners()
+    sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)]
+    if sub.empty:
+        sub = pp_df[(pp_df["hs2_code"] == prod_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())]
+
+    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Chapter {prod_code}"
+    tot_val = sub["value_eur"].sum() if not sub.empty else 0
+
+    top_suppliers = []
+    if not sub.empty:
+        top_p = sub.sort_values("value_eur", ascending=False).head(5)
+        for _, p in top_p.iterrows():
+            sh = (p["value_eur"] / tot_val * 100) if tot_val > 0 else 0
+            c_name = get_country_name(p["partner_code"])
+            top_suppliers.append(html.Div([
+                html.Div([
+                    html.Span(f"{c_name} ({p['partner_code']})", style={"fontSize": "11.5px", "fontWeight": "600", "color": STATEC_NAVY}),
+                    html.Span(f"{fmt_eur(p['value_eur'])} ({sh:.1f}%)", style={"fontSize": "11px", "fontWeight": "700", "color": PRIMARY})
+                ], className="d-flex justify-content-between mb-1"),
+                dbc.Progress(value=sh, color="primary" if flow == "EXPORT" else "dark", style={"height": "5px"}, className="mb-2")
+            ]))
+    else:
+        top_suppliers.append(html.P("Supplier breakdown not available.", className="text-muted", style={"fontSize": "11.5px"}))
+
+    hhi_score = (sub["supplier_share_pct"] ** 2).sum() if ("supplier_share_pct" in sub.columns and not sub.empty) else 0
+
+    return html.Div([
+        html.Div([
+            html.Div([
+                create_icon_badge("bi bi-box-seam-fill", color="#065F46", bg="#DCFCE7", size=15, box_size=32),
+                html.Div([
+                    html.H6(f"Ch. {prod_code} — {prod_name[:26]}", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "margin": "0"}),
+                    html.Small(f"Total Traded Value: {fmt_eur(tot_val)} in {year}", style={"fontSize": "11px", "color": TEXT_MUTED})
+                ], className="ms-2")
+            ], className="d-flex align-items-center mb-2"),
+
+            html.Div([
+                html.Span("Supplier Concentration: ", style={"fontSize": "11px", "color": TEXT_MUTED}),
+                get_concentration_badge(hhi_score)
+            ], className="d-flex align-items-center justify-content-between mb-3"),
+
+            html.Span(f"TOP PARTNER COUNTRIES FOR CH. {prod_code}", style={"fontSize": "10.5px", "fontWeight": "800", "color": TEXT_MUTED, "display": "block", "marginBottom": "6px", "letterSpacing": "0.4px"}),
+            html.Div(top_suppliers)
+        ], className="spotlight-card")
+    ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 7: Q3 — PRINCIPAL PARTNERS FOR A GIVEN PRODUCT
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_q3_product_partners(selected_year):
+    prod_df = load_product_rankings()
+    options = []
+    if not prod_df.empty:
+        u = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
+        options = [{"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
+    def_prod = "87" if any(o["value"] == "87" for o in options) else (options[0]["value"] if options else "87")
+
+    return html.Div([
+        create_section_header(
+            f"Q3: PRINCIPAL PARTNERS BY PRODUCT CATEGORY ({selected_year})",
+            "For a given product category, who are Luxembourg's principal trading partners? Inspect supplier concentration (HHI) and geographic origin breakdown.",
+            badge_text="Research Question Q3",
+            badge_color=STATEC_BLUE
+        ),
+
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("SELECT PRODUCT CATEGORY:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dcc.Dropdown(
+                        id="q3-product-dropdown",
+                        options=options,
+                        value=def_prod,
+                        clearable=False,
+                        style={"fontSize": "12.5px", "fontWeight": "600"}
+                    )
+                ], md=6),
+
+                dbc.Col([
+                    html.Label("TRADE FLOW:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q3-flow-radio",
+                        options=[
+                            {"label": "Imports (Suppliers)", "value": "IMPORT"},
+                            {"label": "Exports (Destinations)", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=6)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "12px 18px", "marginBottom": "16px"}),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H6(id="q3-barchart-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px"}),
+                    dcc.Graph(id="q3-suppliers-bar", config={"displayModeBar": False}, style={"height": "380px"})
+                ], style=CARD_STYLE)
+            ], md=7),
+
+            dbc.Col([
+                html.Div([
+                    html.H6("SUPPLIER GEOGRAPHIC DISTRIBUTION", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px"}),
+                    dcc.Graph(id="q3-suppliers-map", config={"displayModeBar": False}, style={"height": "380px"})
+                ], style=CARD_STYLE)
+            ], md=5)
+        ])
+    ])
+
+
+@callback(
+    Output("q3-barchart-title", "children"),
+    Output("q3-suppliers-bar", "figure"),
+    Output("q3-suppliers-map", "figure"),
+    Input("q3-product-dropdown", "value"),
+    Input("q3-flow-radio", "value"),
+    Input("global-year-dropdown", "value")
+)
+def update_q3_charts(product_code, flow, year):
+    product_code = str(product_code or "87")[:2].zfill(2)
+    pp_df = load_product_partners()
+    sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)].copy()
+    if sub.empty:
+        sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == pp_df["year"].max())].copy()
+
+    top10 = sub.sort_values("value_eur", ascending=False).head(10).copy()
+    top10["country_name_en"] = top10["partner_code"].apply(get_country_name)
+
+    fig_bar = go.Figure(go.Bar(
+        x=top10["value_eur"] / 1e6,
+        y=top10["country_name_en"],
+        orientation="h",
+        marker_color=SECONDARY if flow == "IMPORT" else PRIMARY,
+        text=[fmt_eur(v) for v in top10["value_eur"]],
+        textposition="outside",
+        hovertemplate="<b>%{y} (%{customdata})</b><br>Value: €%{x:,.1f}M<extra></extra>",
+        customdata=top10["partner_code"]
+    ))
+    apply_plot_theme(fig_bar, x_title="Million Euros (€M)")
+    fig_bar.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+
+    # Map
+    sub_map = add_iso3_column(sub).dropna(subset=["iso3"]).copy()
+    sub_map["color_val"] = np.log10(np.maximum(1000.0, sub_map["value_eur"]))
+    fig_map = go.Figure(go.Choropleth(
+        locations=sub_map["iso3"],
+        z=sub_map["color_val"],
+        text=sub_map["partner_code"].apply(get_country_name),
+        customdata=np.stack([sub_map["partner_code"], sub_map["value_eur"]], axis=-1),
+        hovertemplate="<b>%{text}</b><br>Volume: €%{customdata[1]:,.0f}<extra></extra>",
+        colorscale=[[0.0, "#EDE9FE"], [0.4, "#A78BFA"], [0.8, "#6366F1"], [1.0, "#1E1B4B"]],
+        showscale=False
+    ))
+    apply_map_theme(fig_map, scope="europe")
+    fig_map.update_layout(margin=dict(l=0, r=0, t=10, b=0))
+
+    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Ch. {product_code}"
+    title = f"Top 10 Partners for Ch. {product_code} ({prod_name[:25]}) in {year}"
+    return title, fig_bar, fig_map
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 8: Q4 — DETAILED PARTNER TARIFF DRILL-DOWN (HS2 → HS4 → CN8)
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_q4_drilldown(selected_year):
+    partners_df = load_partner_rankings()
+    top_p = ["DE", "BE", "FR", "NL", "US", "CN", "IT", "GB", "PL", "CH"]
+    options = [{"label": f"{get_country_name(c)} ({c})", "value": c} for c in top_p]
+
+    return html.Div([
+        create_section_header(
+            f"Q4: PARTNER TARIFF LINES DRILL-DOWN (HS2 → HS4 → CN8) ({selected_year})",
+            "For a given partner country, what are the main goods traded? Displays increasingly detailed levels of information (up to 8-digit CN8 codes) with a significance threshold filter to eliminate minor noise and confidential cells.",
+            badge_text="Research Question Q4",
+            badge_color=STATEC_BLUE
+        ),
+
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("PARTNER COUNTRY:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dcc.Dropdown(
+                        id="q4-partner-dropdown",
+                        options=options,
+                        value="DE",
+                        clearable=False,
+                        style={"fontSize": "12.5px", "fontWeight": "600"}
+                    )
+                ], md=3),
+
+                dbc.Col([
+                    html.Label("TRADE FLOW:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q4-flow-radio",
+                        options=[
+                            {"label": "Imports", "value": "IMPORT"},
+                            {"label": "Exports", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3),
+
+                dbc.Col([
+                    html.Label("TARIFF GRANULARITY LEVEL:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="q4-level-radio",
+                        options=[
+                            {"label": "HS2 (Chapters)", "value": 2},
+                            {"label": "HS4 (Subheadings)", "value": 4},
+                            {"label": "CN8 (Detailed 8-Digit)", "value": 8},
+                        ],
+                        value=4,
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3),
+
+                dbc.Col([
+                    html.Label("SIGNIFICANCE FILTER:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dcc.Dropdown(
+                        id="q4-threshold-dropdown",
+                        options=[
+                            {"label": "Top 15 Traded Lines", "value": 15},
+                            {"label": "Top 25 Traded Lines", "value": 25},
+                            {"label": "Value > €500k only", "value": 500000},
+                            {"label": "Value > €1M only", "value": 1000000},
+                        ],
+                        value=15,
+                        clearable=False,
+                        style={"fontSize": "12px", "fontWeight": "600"}
+                    )
+                ], md=3)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "12px 18px", "marginBottom": "16px"}),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H6(id="q4-chart-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "fontSize": "13px"}),
+                    dcc.Graph(id="q4-drilldown-bar", config={"displayModeBar": False}, style={"height": "460px"})
+                ], style=CARD_STYLE)
+            ], md=12)
+        ])
+    ])
+
+
+@callback(
+    Output("q4-chart-title", "children"),
+    Output("q4-drilldown-bar", "figure"),
+    Input("q4-partner-dropdown", "value"),
+    Input("q4-flow-radio", "value"),
+    Input("q4-level-radio", "value"),
+    Input("q4-threshold-dropdown", "value"),
+    Input("global-year-dropdown", "value")
+)
+def update_q4_chart(partner_code, flow, level, threshold, year):
+    partner_code = str(partner_code or "DE").upper()
+    level = int(level or 4)
+
+    if level == 8:
+        df = load_drilldown_lvl8()
+    elif level == 4:
+        df = load_drilldown_lvl4()
+    else:
+        df = load_drilldown_lvl2()
+
+    sub = df[(df["partner_code"] == partner_code) & (df["flow"] == flow)].copy()
+    if sub.empty:
+        # Fallback to level 2
+        df2 = load_drilldown_lvl2()
+        sub = df2[(df2["partner_code"] == partner_code) & (df2["flow"] == flow)].copy()
+        level = 2
+
+    if threshold in [15, 25]:
+        sub = sub.sort_values("value_eur", ascending=False).head(int(threshold)).copy()
+    else:
+        sub = sub[sub["value_eur"] >= float(threshold)].sort_values("value_eur", ascending=False).head(30).copy()
+
+    sub["label"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: str(s)[:45] + ".." if len(str(s)) > 45 else str(s))
+
+    fig = go.Figure(go.Bar(
+        x=sub["value_eur"] / 1e6,
+        y=sub["label"],
+        orientation="h",
+        marker_color=SECONDARY if flow == "IMPORT" else PRIMARY,
+        text=[fmt_eur(v) for v in sub["value_eur"]],
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Value: €%{x:,.2f}M<extra></extra>"
+    ))
+    apply_plot_theme(fig, x_title="Million Euros (€M)")
+    fig.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
+
+    title = f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()})"
+    return title, fig
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 9: Q5 — REGIONAL PEER BENCHMARKING
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_benchmarks(selected_year):
+    bench_df = load_country_benchmarks()
+    if bench_df.empty:
+        return html.Div("Peer benchmarks not available.")
+
+    fig_index = go.Figure()
+    country_colors = {"LU": STATEC_YELLOW, "DE": STATEC_NAVY, "FR": STATEC_BLUE, "BE": "#DC2626", "NL": "#D97706"}
+    country_names = {"LU": "Luxembourg", "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands"}
+
+    for c in ["LU", "DE", "FR", "BE", "NL"]:
+        c_sub = bench_df[bench_df["reporter_code"] == c].sort_values("year")
+        if not c_sub.empty and "volume_index_2000" in c_sub.columns:
+            fig_index.add_trace(go.Scatter(
+                x=c_sub["year"], y=c_sub["volume_index_2000"],
+                name=country_names.get(c, c),
+                mode="lines+markers" if c == "LU" else "lines",
+                line=dict(color=country_colors.get(c, STATEC_GRAY), width=3.5 if c == "LU" else 2),
+                marker=dict(size=6 if c == "LU" else 0),
+                hovertemplate="%{x}: Index %{y:.1f}<extra></extra>"
+            ))
+    apply_plot_theme(fig_index, title="Merchandise Trade Volume Growth Index (Base 100 = Year 2000)", y_title="Index (2000 = 100)", dtick_x=2, hovermode="x unified")
+
+    sub_yr = bench_df[bench_df["year"] == selected_year]
+    if sub_yr.empty:
+        sub_yr = bench_df[bench_df["year"] == bench_df["year"].max()]
+
+    sub_yr = sub_yr.copy()
+    sub_yr["name"] = sub_yr["reporter_code"].apply(lambda r: country_names.get(r, r))
+    fig_cov = go.Figure(go.Bar(
+        x=sub_yr["coverage_ratio_pct"],
+        y=sub_yr["name"],
+        orientation="h",
+        marker_color=[STATEC_YELLOW if r == "LU" else (SUCCESS if v >= 100 else SECONDARY) for r, v in zip(sub_yr["reporter_code"], sub_yr["coverage_ratio_pct"])],
+        text=sub_yr["coverage_ratio_pct"].apply(lambda v: f"{v:.1f}%"),
+        textposition="outside",
+        hovertemplate="%{y}: Coverage Ratio %{x:.1f}%<extra></extra>"
+    ))
+    apply_plot_theme(fig_cov, title=f"Merchandise Trade Coverage Ratio in {selected_year} (Exports / Imports %)", x_title="Coverage Ratio (%)")
+    fig_cov.add_vline(x=100, line_dash="dash", line_color=SUCCESS, annotation_text="Trade Balance (100%)")
+    fig_cov.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
+
+    return html.Div([
+        create_section_header(
+            f"Q5: REGIONAL PEER BENCHMARKING ({selected_year})",
+            "How does Luxembourg's trade compare with neighboring economies (Germany, France, Belgium, Netherlands)? Volume expansion indices and structural coverage ratio asymmetries.",
+            badge_text="Research Question Q5",
+            badge_color=STATEC_BLUE
+        ),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_index, config={"displayModeBar": False})], style=CARD_STYLE)
+            ], md=7),
+            dbc.Col([
+                html.Div([dcc.Graph(figure=fig_cov, config={"displayModeBar": False})], style=CARD_STYLE)
+            ], md=5)
+        ])
+    ])
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# TAB 10: Q6 — SEASONALITY & TREND LAB
+# ───────────────────────────────────────────────────────────────────────────
+def render_tab_seasonality():
+    sea_df = load_seasonal_decomposition()
+    options = []
+    if not sea_df.empty:
+        u = sea_df[["product_code", "product_name"]].drop_duplicates().sort_values("product_code")
+        options = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
+    def_p = "TOTAL" if any(o["value"] == "TOTAL" for o in options) else (options[0]["value"] if options else "TOTAL")
+
+    return html.Div([
+        create_section_header(
+            "Q6: ECONOMETRIC SEASONALITY & TREND LAB",
+            "Do Luxembourg's trade flows exhibit specific seasonal patterns? Decomposes monthly trade into raw observed series, 12-month centered rolling trends, and seasonally adjusted series.",
+            badge_text="Research Question Q6",
+            badge_color=STATEC_BLUE
+        ),
+
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("PRODUCT SECTOR:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dcc.Dropdown(
+                        id="sea-product-dropdown",
+                        options=options,
+                        value=def_p,
+                        clearable=False,
+                        style={"fontSize": "12.5px", "fontWeight": "600"}
+                    )
+                ], md=4),
+
+                dbc.Col([
+                    html.Label("TRADE FLOW:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.RadioItems(
+                        id="sea-flow-radio",
+                        options=[
+                            {"label": "Imports", "value": "IMPORT"},
+                            {"label": "Exports", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=4),
+
+                dbc.Col([
+                    html.Label("SERIES DISPLAY:", style={"fontWeight": "800", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.5px"}),
+                    dbc.Checklist(
+                        id="sea-series-checklist",
+                        options=[
+                            {"label": "Raw Observed", "value": "raw"},
+                            {"label": "12M Rolling Trend", "value": "trend"},
+                            {"label": "Seasonally Adjusted", "value": "adj"},
+                        ],
+                        value=["raw", "trend"],
+                        inline=True,
+                        style={"fontSize": "12px", "fontWeight": "600"}
+                    )
+                ], md=4)
+            ], align="center")
+        ], style={**CARD_STYLE, "padding": "12px 18px", "marginBottom": "16px"}),
+
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(id="sea-timeseries-chart", config={"displayModeBar": False}, style={"height": "380px"})
+                ], style=CARD_STYLE)
+            ], md=8),
+
+            dbc.Col([
+                html.Div([
+                    dcc.Graph(id="sea-factors-chart", config={"displayModeBar": False}, style={"height": "380px"})
+                ], style=CARD_STYLE)
+            ], md=4)
+        ])
+    ])
+
+
+@callback(
+    Output("sea-timeseries-chart", "figure"),
+    Output("sea-factors-chart", "figure"),
+    Input("sea-product-dropdown", "value"),
+    Input("sea-flow-radio", "value"),
+    Input("sea-series-checklist", "value")
+)
+def update_seasonality_charts(product, flow, selected_series):
+    sea_df = load_seasonal_decomposition()
+    sub = sea_df[(sea_df["product_code"] == str(product)) & (sea_df["flow"] == flow)].sort_values("date").copy()
+    if sub.empty:
+        return go.Figure(), go.Figure()
+
+    fig_ts = go.Figure()
+    if "raw" in selected_series:
+        fig_ts.add_trace(go.Scatter(
+            x=sub["date"], y=sub["value_eur"] / 1e6,
+            name="Raw Observed", mode="lines",
+            line=dict(color="#94A3B8", width=1.5),
+            hovertemplate="%{x}: €%{y:,.1f}M<extra></extra>"
+        ))
+    if "trend" in selected_series:
+        fig_ts.add_trace(go.Scatter(
+            x=sub["date"], y=sub["trend_eur"] / 1e6,
+            name="12M Centered Trend", mode="lines",
+            line=dict(color=PRIMARY, width=3),
+            hovertemplate="%{x}: Trend €%{y:,.1f}M<extra></extra>"
+        ))
+    if "adj" in selected_series:
+        fig_ts.add_trace(go.Scatter(
+            x=sub["date"], y=sub["seasonally_adjusted_eur"] / 1e6,
+            name="Seasonally Adjusted", mode="lines",
+            line=dict(color=SUCCESS, width=2, dash="dot"),
+            hovertemplate="%{x}: SA €%{y:,.1f}M<extra></extra>"
+        ))
+    apply_plot_theme(fig_ts, title=f"Monthly Trade Timeseries ({sub['product_name'].iloc[0]}) (€M)", y_title="Million Euros (€M)", hovermode="x unified")
+    fig_ts.update_layout(margin=dict(l=10, r=20, t=35, b=30))
+
+    # Factors chart
+    factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
+    colors = [DANGER if m == 8 else (SUCCESS if f > 1.05 else STATEC_BLUE) for m, f in zip(factors["month"], factors["seasonal_factor"])]
+    fig_factors = go.Figure(go.Bar(
+        x=factors["month_name"],
+        y=(factors["seasonal_factor"] - 1.0) * 100,
+        marker_color=colors,
+        text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
+        textposition="outside",
+        hovertemplate="%{x}: %{text}<extra></extra>"
+    ))
+    apply_plot_theme(fig_factors, title="Seasonal Factors (% vs Annual Trend)", y_title="% vs Annual Trend")
+    fig_factors.update_layout(margin=dict(l=10, r=30, t=35, b=30))
+
+    return fig_ts, fig_factors
 
 
 # ── Run Server ─────────────────────────────────────────────────────────────

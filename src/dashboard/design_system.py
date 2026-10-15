@@ -433,7 +433,7 @@ def create_info_hover(
         trigger = html.Span(
             icon_node,
             className="info-hover-icon",
-            title="Survoler pour afficher l'explication",
+            title="Hover to view explanation",
             style={
                 "backgroundColor": cfg["icon_bg"],
                 "color": cfg["icon_color"],
@@ -591,8 +591,54 @@ def create_infobox(title: str, text_or_elements, icon: str = "💡", variant: st
     })
 
 
+import pandas as pd
+
+def fmt_eur(val: float) -> str:
+    """Format euro value in Billions, Millions, or Thousands."""
+    if val is None or pd.isna(val):
+        return "—"
+    abs_v = abs(val)
+    sign = "-" if val < 0 else ""
+    if abs_v >= 1e9:
+        return f"{sign}€{abs_v/1e9:.2f}B"
+    elif abs_v >= 1e6:
+        return f"{sign}€{abs_v/1e6:.1f}M"
+    elif abs_v >= 1e3:
+        return f"{sign}€{abs_v/1e3:.0f}k"
+    else:
+        return f"{sign}€{abs_v:,.0f}"
+
+
+def fmt_pct(val: float) -> str:
+    """Format percentage value."""
+    if val is None or pd.isna(val):
+        return "—"
+    return f"{val:.1f}%"
+
+
+def get_concentration_badge(hhi: float):
+    """Return colored badge for Herfindahl-Hirschman Index (HHI) concentration."""
+    if pd.isna(hhi) or hhi is None:
+        return html.Span("N/A", className="badge bg-secondary")
+    if hhi >= 2500:
+        return html.Span(f"HHI {hhi:.0f} • High Concentration (>2500)", style={
+            "backgroundColor": "#FEE2E2", "color": "#B91C1C", "padding": "4px 10px",
+            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCA5A5"
+        })
+    elif hhi >= 1500:
+        return html.Span(f"HHI {hhi:.0f} • Moderate Concentration (1500–2500)", style={
+            "backgroundColor": "#FEF3C7", "color": "#B45309", "padding": "4px 10px",
+            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #FCD34D"
+        })
+    else:
+        return html.Span(f"HHI {hhi:.0f} • Low Concentration (<1500)", style={
+            "backgroundColor": "#D1FAE5", "color": "#047857", "padding": "4px 10px",
+            "borderRadius": "20px", "fontWeight": "600", "fontSize": "11px", "border": "1px solid #6EE7B7"
+        })
+
+
 def create_dashboard_footer():
-    """Footer for Luxembourg Trade Intelligence — Hackathon Research Prototype with non-official disclaimer."""
+    """Institutional footer with English disclaimer for Hackathon 2026."""
     return html.Footer([
         html.Div([
             html.Div([
@@ -600,28 +646,28 @@ def create_dashboard_footer():
                     "fontSize": "20px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
                     "color": "#FFFFFF", "letterSpacing": "-0.5px"
                 }),
-                html.Span("INTELLIGENCE.lu", style={
+                html.Span(".lu", style={
                     "fontSize": "20px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif",
                     "color": STATEC_YELLOW
                 }),
-                html.Span("OBSERVATOIRE ANALYTIQUE INDÉPENDANT DU COMMERCE EXTÉRIEUR", style={
+                html.Span("INDEPENDENT EXTERNAL TRADE OBSERVATORY", style={
                     "fontSize": "9px", "fontWeight": "700", "letterSpacing": "1.2px",
                     "color": "#94A3B8", "display": "block", "marginTop": "2px"
                 }),
             ], className="mb-3 mb-md-0"),
 
             html.Div([
-                html.Span("Données sources : Eurostat Comext [ds-045409] & Données ouvertes du STATEC (2000–2026)", style={
+                html.Span("Data sources: Eurostat Comext [ds-045409] & STATEC Open Data (2000–2026)", style={
                     "fontSize": "11.5px", "color": "#CBD5E1", "display": "block"
                 }),
-                html.Span("Projet de recherche analytique • Hackathon 2026 (Prototype non officiel)", style={
+                html.Span("Analytical Research Project • Hackathon 2026 (Unofficial Prototype)", style={
                     "fontSize": "10.5px", "color": "#94A3B8", "display": "block", "marginTop": "2px"
                 }),
             ], className="text-md-end text-start"),
         ], className="d-flex flex-column flex-md-row justify-content-between align-items-md-center py-4", style={"maxWidth": "1540px", "margin": "0 auto", "padding": "0 15px"}),
-        
+
         html.Div([
-            html.P("Avertissement : Ce tableau de bord est un projet d'exploration analytique indépendant et de recherche réalisé dans le cadre du Hackathon 2026. Il ne constitue en aucun cas un site ou produit officiel du STATEC ni du Gouvernement du Grand-Duché de Luxembourg.", style={
+            html.P("Disclaimer: This dashboard is an exploratory analytical research prototype created for the STATEC Hackathon 2026. It is not an official website or product of STATEC or the Government of the Grand Duchy of Luxembourg.", style={
                 "fontSize": "10.5px", "color": "#94A3B8", "margin": "0", "textAlign": "center", "padding": "12px 15px",
                 "backgroundColor": "#001226", "lineHeight": "1.5"
             })
@@ -631,5 +677,6 @@ def create_dashboard_footer():
 
 # Compatibility alias
 create_statec_footer = create_dashboard_footer
+
 
 

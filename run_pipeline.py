@@ -45,7 +45,7 @@ def main():
 
     if args.all or args.app:
         logger.info(f"Starting Interactive Dash Application on http://127.0.0.1:{args.port} ...")
-        app.run(debug=False, port=args.port, host="127.0.0.1")
+        app.run(debug=True, port=args.port, host="127.0.0.1")
 
 
 if __name__ == "__main__":
