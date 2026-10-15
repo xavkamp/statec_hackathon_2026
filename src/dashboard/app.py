@@ -491,13 +491,11 @@ def render_sub_tabs(mode, active_tab_store):
             dbc.Tab(label="3. EXPOSITION GÉOPOLITIQUE & CHOCS SAISONNIERS", tab_id="tab-geopolitics", label_style=tab_label_style, active_label_style=tab_active_style),
         ], style={"borderBottom": "2px solid #E2E8F0"})
     else:
-        default_tab = active_tab_store if active_tab_store in ["tab-partners", "tab-products", "tab-drilldown", "tab-seasonality", "tab-benchmarks"] else "tab-partners"
+        default_tab = active_tab_store if active_tab_store in ["tab-studio", "tab-partners", "tab-products", "tab-drilldown", "tab-seasonality", "tab-benchmarks"] else "tab-studio"
         return dbc.Tabs(id="sub-tabs", active_tab=default_tab, children=[
-            dbc.Tab(label="1. PARTENAIRES COMMERCIAUX (Q1)", tab_id="tab-partners", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="2. STRUCTURE PAR PRODUITS (Q2)", tab_id="tab-products", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="3. DRILL-DOWN TARIFAIRE HS2→CN8 (Q3 & Q4)", tab_id="tab-drilldown", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="4. LABORATOIRE DE SAISONNALITÉ (Q6)", tab_id="tab-seasonality", label_style=tab_label_style, active_label_style=tab_active_style),
-            dbc.Tab(label="5. BENCHMARKS COMPARATIFS (Q5)", tab_id="tab-benchmarks", label_style=tab_label_style, active_label_style=tab_active_style),
+            dbc.Tab(label="1. STUDIO GÉO-TARIFAIRE & DRILL-DOWN (Q1–Q4)", tab_id="tab-studio", label_style=tab_label_style, active_label_style=tab_active_style),
+            dbc.Tab(label="2. LABORATOIRE DE SAISONNALITÉ (Q6)", tab_id="tab-seasonality", label_style=tab_label_style, active_label_style=tab_active_style),
+            dbc.Tab(label="3. BENCHMARKS COMPARATIFS (Q5)", tab_id="tab-benchmarks", label_style=tab_label_style, active_label_style=tab_active_style),
         ], style={"borderBottom": "2px solid #E2E8F0"})
 
 
@@ -514,12 +512,8 @@ def render_tab_content(active_tab, selected_year):
         return render_tab_overview()
     elif active_tab == "tab-geopolitics":
         return render_tab_geopolitics(selected_year)
-    elif active_tab == "tab-partners":
-        return render_tab_partners(selected_year)
-    elif active_tab == "tab-products":
-        return render_tab_products(selected_year)
-    elif active_tab == "tab-drilldown":
-        return render_tab_drilldown(selected_year)
+    elif active_tab in ["tab-studio", "tab-partners", "tab-products", "tab-drilldown"]:
+        return render_studio_tab(selected_year)
     elif active_tab == "tab-benchmarks":
         return render_tab_benchmarks(selected_year)
     elif active_tab == "tab-seasonality":
@@ -821,1071 +815,780 @@ def render_tab_geopolitics(selected_year):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# TAB 1 (ANALYST): TRADING PARTNERS (Q1)
+# TAB 1 (ANALYST): STUDIO GÉO-TARIFAIRE & DRILL-DOWN BILATÉRAL (Q1–Q4)
 # ───────────────────────────────────────────────────────────────────────────
-def render_tab_partners(selected_year):
+
+ISO2_NAMES = {
+    "DE": "Allemagne", "FR": "France", "BE": "Belgique", "NL": "Pays-Bas",
+    "US": "États-Unis", "IT": "Italie", "GB": "Royaume-Uni", "ES": "Espagne",
+    "CN": "Chine", "CH": "Suisse", "PL": "Pologne", "AT": "Autriche",
+    "SE": "Suède", "JP": "Japon", "CZ": "Tchéquie", "DK": "Danemark",
+    "IE": "Irlande", "PT": "Portugal", "TR": "Turquie", "IN": "Inde",
+    "BR": "Brésil", "KR": "Corée du Sud", "NO": "Norvège", "RU": "Russie",
+    "CA": "Canada", "MX": "Mexique", "AU": "Australie", "ZA": "Afrique du Sud",
+    "HU": "Hongrie", "RO": "Roumanie", "SG": "Singapour", "LU": "Luxembourg"
+}
+
+def get_country_name(iso2):
+    return ISO2_NAMES.get(str(iso2).upper(), str(iso2))
+
+
+def get_partner_products(partner_code, flow, year, level=2):
+    """
+    Unified product extractor for any trading partner across HS2, HS4, and CN8.
+    Returns (df, is_fallback, level_label).
+    """
+    level = int(level)
+    partner_code = str(partner_code).upper()
+    top_5 = ["BE", "DE", "FR", "NL", "US"]
+
+    if level == 8 and partner_code in top_5:
+        df8 = load_drilldown_lvl8()
+        sub = df8[(df8["partner_code"] == partner_code) & (df8["flow"] == flow)].copy()
+        if not sub.empty:
+            sub = sub.sort_values("value_eur", ascending=False)
+            sub["short_name"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
+            return sub, False, "CN8 (Lignes tarifaires douanières à 8 chiffres)"
+
+    if level == 4 and partner_code in top_5:
+        df4 = load_drilldown_lvl4()
+        sub = df4[(df4["partner_code"] == partner_code) & (df4["flow"] == flow)].copy()
+        if not sub.empty:
+            sub = sub.sort_values("value_eur", ascending=False)
+            sub["short_name"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
+            return sub, False, "HS4 (Sous-positions tarifaires à 4 chiffres)"
+
+    # Universal Fallback for any of the 238 countries in product_partners
+    partners_df = load_product_partners()
+    valid_years = sorted(partners_df["year"].unique())
+    target_year = year if year in valid_years else max(valid_years)
+
+    sub = partners_df[(partners_df["partner_code"] == partner_code) &
+                      (partners_df["flow"] == flow) &
+                      (partners_df["year"] == target_year)].copy()
+
+    if sub.empty:
+        sub = partners_df[(partners_df["partner_code"] == partner_code) & (partners_df["flow"] == flow)].copy()
+        if not sub.empty:
+            target_year = sub["year"].max()
+            sub = sub[sub["year"] == target_year]
+
+    if not sub.empty:
+        sub = sub.rename(columns={"hs2_code": "product_code", "hs2_name": "product_name"})
+        sub = sub.sort_values("value_eur", ascending=False)
+        sub["short_name"] = "Ch." + sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: s[:50] + ".." if len(str(s)) > 50 else str(s))
+        is_fallback = (level in [4, 8] and partner_code not in top_5)
+        return sub, is_fallback, "HS2 (Chapitres à 2 chiffres)"
+
+    return pd.DataFrame(), False, "Données non disponibles"
+
+
+def render_studio_tab(selected_year):
+    prod_df = load_product_rankings()
+    prod_options = []
+    if not prod_df.empty:
+        hs2_unique = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
+        prod_options = [
+            {"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:45]}", "value": str(r["hs2_code"])}
+            for _, r in hs2_unique.iterrows()
+        ]
+    default_prod = "87" if any(o["value"] == "87" for o in prod_options) else (prod_options[0]["value"] if prod_options else "87")
+
+    initial_layout = render_studio_perspective_layout("country", selected_year)
+
     return html.Div([
+        # Section Header with Info Tooltip
         create_section_header(
-            f"CARTOGRAPHIE DES PARTENAIRES COMMERCIAUX ({selected_year})",
-            "Exploration spatiale et temporelle des pays partenaires du Grand-Duché. Cliquez sur n'importe quel pays sur la carte pour projeter son historique bilatéral et son profil d'échanges.",
-            badge_text="Eurostat Q1",
+            f"STUDIO GÉO-TARIFAIRE & DRILL-DOWN BILATÉRAL ({selected_year})",
+            "Espace analytique unifié interconnecté : cliquez sur n'importe quel pays sur la carte ou dans le palmarès pour projeter en temps réel son panier de produits (Q2), ses fournisseurs alternatifs (Q3) et plonger jusqu'aux lignes douanières CN8 à 8 chiffres (Q4).",
+            badge_text="Eurostat Q1 • Q2 • Q3 • Q4",
             badge_color=STATEC_BLUE,
-            info_title="Carte Interactive & Consignation Douanière",
-            info_content="Cliquez sur n'importe quel pays partenaire sur le planisphère pour charger instantanément sa fiche bilatérale et projeter l'évolution de ses parts de marché depuis 2000. Note : Les données Eurostat enregistrent les importations selon le pays de provenance/consignation, ce qui reflète les flux physiques réels traversant les frontières limitrophes.",
-            info_icon="bi bi-globe-americas",
+            info_title="Studio Unifié & Niveaux de Nomenclature Douanière",
+            info_content=[
+                html.P("Ce studio interconnecte les 4 dimensions fondamentales du commerce extérieur :", style={"fontWeight": "600", "marginBottom": "6px"}),
+                html.Ul([
+                    html.Li("Q1 (Partenaires) : Carte choroplèthe mondiale et classement des flux bilatéraux."),
+                    html.Li("Q2 (Produits) : Répartition du panier d'échanges et sections macroéconomiques."),
+                    html.Li("Q3 (Fournisseurs & HHI) : Indice de dépendance et cartographie des pays d'origine par produit."),
+                    html.Li("Q4 (Drill-Down Tarifaire) : Du chapitre (HS2) à la sous-position (HS4) et à la ligne fine douanière (CN8)."),
+                ], style={"paddingLeft": "18px", "marginBottom": "0"})
+            ],
+            info_icon="bi bi-grid-1x2-fill",
             info_variant="primary"
         ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    # Modern Integrated Map Control Toolbar
-                    html.Div([
-                        dbc.Row([
-                            dbc.Col([
-                                html.Div([
-                                    html.Label([
-                                        html.I(className="bi bi-arrow-left-right me-1", style={"color": STATEC_BLUE}),
-                                        "FLUX COMMERCIAL"
-                                    ], style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "10.5px", "color": STATEC_NAVY, "letterSpacing": "0.5px", "marginBottom": "4px", "display": "block"}),
-                                    dbc.RadioItems(
-                                        id="partner-flow-radio",
-                                        options=[
-                                            {"label": "Exportations", "value": "EXPORT"},
-                                            {"label": "Importations", "value": "IMPORT"},
-                                        ],
-                                        value="EXPORT",
-                                        className="btn-group",
-                                        inputClassName="btn-check",
-                                        labelClassName="btn btn-outline-primary btn-sm",
-                                        labelCheckedClassName="active",
-                                        style={"display": "inline-flex"}
-                                    )
-                                ])
-                            ], md=4, sm=12, className="mb-2 mb-md-0"),
 
-                            dbc.Col([
-                                html.Div([
-                                    html.Label([
-                                        html.I(className="bi bi-compass me-1", style={"color": STATEC_BLUE}),
-                                        "PÉRIMÈTRE GÉOGRAPHIQUE"
-                                    ], style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "10.5px", "color": STATEC_NAVY, "letterSpacing": "0.5px", "marginBottom": "4px", "display": "block"}),
-                                    dbc.RadioItems(
-                                        id="partner-map-scope",
-                                        options=[
-                                            {"label": "Europe", "value": "europe"},
-                                            {"label": "Monde", "value": "world"},
-                                            {"label": "Amériques", "value": "north america"},
-                                            {"label": "Asie", "value": "asia"},
-                                        ],
-                                        value="europe",
-                                        className="btn-group",
-                                        inputClassName="btn-check",
-                                        labelClassName="btn btn-outline-secondary btn-sm",
-                                        labelCheckedClassName="active",
-                                        style={"display": "inline-flex"}
-                                    )
-                                ])
-                            ], md=5, sm=12, className="mb-2 mb-md-0"),
+        # Master Interactive Studio Control Ribbon
+        html.Div([
+            dbc.Row([
+                # Perspective Toggle
+                dbc.Col([
+                    html.Label([
+                        html.I(className="bi bi-sliders me-1 text-primary"),
+                        html.Span("Mode d'Exploration :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
+                    ], className="d-block mb-1"),
+                    dbc.RadioItems(
+                        id="studio-perspective-radio",
+                        options=[
+                            {"label": "🌍 Par Pays (Q1 & Q4)", "value": "country"},
+                            {"label": "📦 Par Produit (Q2 & Q3)", "value": "product"},
+                        ],
+                        value="country",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-primary btn-sm px-3 py-1",
+                        label_checked_class_name="btn btn-primary btn-sm px-3 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=4, sm=12, className="mb-2 mb-md-0"),
 
-                            dbc.Col([
-                                html.Div([
-                                    html.Label([
-                                        html.I(className="bi bi-sliders2 me-1", style={"color": STATEC_BLUE}),
-                                        "MÉTRIQUE"
-                                    ], style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "10.5px", "color": STATEC_NAVY, "letterSpacing": "0.5px", "marginBottom": "4px", "display": "block"}),
-                                    dbc.RadioItems(
-                                        id="partner-map-metric",
-                                        options=[
-                                            {"label": "Valeur (€)", "value": "value_eur"},
-                                            {"label": "Part (%)", "value": "market_share_pct"},
-                                        ],
-                                        value="value_eur",
-                                        className="btn-group",
-                                        inputClassName="btn-check",
-                                        labelClassName="btn btn-outline-secondary btn-sm",
-                                        labelCheckedClassName="active",
-                                        style={"display": "inline-flex"}
-                                    )
-                                ])
-                            ], md=3, sm=12),
-                        ], className="align-items-center")
-                    ], className="p-2 mb-3 rounded", style={"backgroundColor": "#F8FAFC", "border": "1px solid #E2E8F0"}),
+                # Flow Radio
+                dbc.Col([
+                    html.Label([
+                        html.I(className="bi bi-arrow-left-right me-1 text-primary"),
+                        html.Span("Flux Douanier :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
+                    ], className="d-block mb-1"),
+                    dbc.RadioItems(
+                        id="studio-flow-radio",
+                        options=[
+                            {"label": "Importations (Fournisseurs)", "value": "IMPORT"},
+                            {"label": "Exportations (Clients)", "value": "EXPORT"},
+                        ],
+                        value="IMPORT",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3, sm=6, className="mb-2 mb-md-0"),
 
-                    dcc.Graph(
-                        id="partner-map-graph",
-                        config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False},
-                        style={"height": "460px"}
-                    ),
+                # Geographic Scope Radio
+                dbc.Col([
+                    html.Label([
+                        html.I(className="bi bi-geo-alt me-1 text-primary"),
+                        html.Span("Périmètre Géo :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
+                    ], className="d-block mb-1"),
+                    dbc.RadioItems(
+                        id="studio-scope-radio",
+                        options=[
+                            {"label": "Monde", "value": "GLOBAL"},
+                            {"label": "UE-27", "value": "EU27"},
+                            {"label": "Extra-UE", "value": "EXTRA_EU"},
+                        ],
+                        value="GLOBAL",
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-dark btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=2, sm=6, className="mb-2 mb-md-0"),
 
-                    # Interactive Country Spotlight on Map Click
-                    html.Div(id="partner-click-spotlight", className="mt-2")
-                ], style=CARD_STYLE)
-            ], md=8),
-            dbc.Col([
-                html.Div([
-                    html.H6(id="partner-top10-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginBottom": "12px"}),
-                    dcc.Graph(id="partner-top10-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=4),
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6("ÉVOLUTION HISTORIQUE DES PARTS DE MARCHÉ (2000–2026)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginBottom": "4px"}),
-                    html.P("Trajectoire séculaire des parts relatives des partenaires majeurs. Cliquez sur un pays sur la carte ci-dessus pour projeter sa trajectoire dédiée.", className="text-muted", style={"fontSize": "12px"}),
-                    dcc.Graph(id="partner-history-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ])
+                # Granularity Selector
+                dbc.Col([
+                    html.Label([
+                        html.I(className="bi bi-layers me-1 text-primary"),
+                        html.Span("Nomenclature Tarifaire :", style={"fontWeight": "700", "fontSize": "11.5px", "color": STATEC_NAVY})
+                    ], className="d-block mb-1"),
+                    dbc.RadioItems(
+                        id="studio-granularity-radio",
+                        options=[
+                            {"label": "HS2 (2 ch.)", "value": 2},
+                            {"label": "HS4 (4 ch.)", "value": 4},
+                            {"label": "CN8 (8 ch.)", "value": 8},
+                        ],
+                        value=2,
+                        inline=True,
+                        className="btn-group",
+                        input_class_name="btn-check",
+                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
+                        style={"fontSize": "12px"}
+                    )
+                ], md=3, sm=12)
+            ], align="center")
+        ], style={
+            "backgroundColor": "#FFFFFF", "borderRadius": "10px", "padding": "12px 18px",
+            "boxShadow": "0 2px 8px rgba(0,0,0,0.04)", "border": f"1px solid {BORDER}",
+            "marginBottom": "16px"
+        }),
+
+        # Stores to preserve selection state across interactions
+        dcc.Store(id="studio-selected-partner", data="DE"),
+        dcc.Store(id="studio-selected-product", data=default_prod),
+
+        # Dynamic Perspective Container (pre-populated with initial layout)
+        html.Div(initial_layout, id="studio-perspective-container")
     ])
 
 
+# ── Studio Callbacks ───────────────────────────────────────────────────────
+
 @callback(
-    Output("partner-map-graph", "figure"),
-    Output("partner-top10-title", "children"),
-    Output("partner-top10-graph", "figure"),
-    Output("partner-history-graph", "figure"),
-    Input("partner-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("partner-map-scope", "value"),
-    Input("partner-map-metric", "value"),
-    Input("partner-map-graph", "clickData")
+    Output("studio-selected-partner", "data"),
+    Input("studio-world-map", "clickData"),
+    Input("studio-top-partners-bar", "clickData"),
+    State("studio-selected-partner", "data")
 )
-def update_partner_tab(flow, year, scope, metric, click_data):
+def update_studio_selected_partner(map_click, bar_click, current_partner):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return current_partner or "DE"
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger_id == "studio-world-map" and map_click:
+        pt = map_click["points"][0]
+        if "customdata" in pt and pt["customdata"] is not None:
+            c = pt["customdata"]
+            res = c[0] if isinstance(c, (list, tuple, np.ndarray)) else str(c)
+            return str(res).strip().upper()
+        if "location" in pt:
+            for c2, c3 in ISO2_TO_ISO3.items():
+                if c3 == pt["location"]:
+                    return c2
+    elif trigger_id == "studio-top-partners-bar" and bar_click:
+        pt = bar_click["points"][0]
+        if "customdata" in pt and pt["customdata"] is not None:
+            c = pt["customdata"]
+            res = c[0] if isinstance(c, (list, tuple, np.ndarray)) else str(c)
+            return str(res).strip().upper()
+        if "y" in pt:
+            y_str = str(pt["y"])
+            if "(" in y_str and ")" in y_str:
+                return y_str.split("(")[-1].split(")")[0].strip().upper()
+            for c2, name in ISO2_NAMES.items():
+                if name.lower() in y_str.lower():
+                    return c2
+    return current_partner or "DE"
+
+
+@callback(
+    Output("studio-perspective-container", "children"),
+    Input("studio-perspective-radio", "value"),
+    Input("global-year-dropdown", "value")
+)
+def render_studio_perspective_layout(perspective, year):
+    year = int(year or 2024)
+    if perspective == "country":
+        # Pre-compute initial figures to guarantee instant display
+        init_map, init_bar, init_hist = update_studio_partner_left("IMPORT", year, "GLOBAL", "DE")
+        init_spotlight, init_treemap, init_prod_bar = update_studio_partner_right("DE", "IMPORT", year, 2)
+
+        return dbc.Row([
+            # Left Column (Spatial & Rankings Q1)
+            dbc.Col([
+                # Interactive World Map Card
+                html.Div([
+                    html.Div([
+                        html.Div([
+                            create_icon_badge("bi bi-globe-americas", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
+                            html.Div([
+                                html.H6("CARTOGRAPHIE MONDIALE DES ÉCHANGES (Q1)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
+                                html.P("Cliquez sur un pays sur la carte ou le bar-chart pour projeter son panier de biens à droite.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
+                            ], className="ms-2")
+                        ], className="d-flex align-items-center"),
+                    ], className="mb-2"),
+                    dcc.Graph(id="studio-world-map", figure=init_map, config={"displayModeBar": False})
+                ], style={**CARD_STYLE, "marginBottom": "16px"}),
+
+                # Top 10 Partners Bar Card
+                html.Div([
+                    html.Div([
+                        create_icon_badge("bi bi-bar-chart-line-fill", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
+                        html.H6("PALMARÈS DES PARTENAIRES COMMERCIAUX (Q1)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
+                    ], className="d-flex align-items-center mb-2"),
+                    dcc.Graph(id="studio-top-partners-bar", figure=init_bar, config={"displayModeBar": False})
+                ], style={**CARD_STYLE, "marginBottom": "16px"}),
+
+                # Historical Trade Trend Card
+                html.Div([
+                    html.Div([
+                        create_icon_badge("bi bi-graph-up-arrow", color="#059669", bg="#D1FAE5", size=15, box_size=30),
+                        html.H6("TRAJECTOIRE HISTORIQUE BILATÉRALE (2000–2024)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
+                    ], className="d-flex align-items-center mb-2"),
+                    dcc.Graph(id="studio-partner-history-chart", figure=init_hist, config={"displayModeBar": False})
+                ], style=CARD_STYLE),
+            ], md=7, sm=12),
+
+            # Right Column (Bilateral Products & CN8 Drill-Down Q2 & Q4)
+            dbc.Col([
+                # Selected Country Spotlight Header Card
+                html.Div(init_spotlight, id="studio-partner-spotlight-container"),
+
+                # Products Treemap Card
+                html.Div([
+                    html.Div([
+                        create_icon_badge("bi bi-boxes", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
+                        html.Div([
+                            html.H6("COMPOSITION DU PANIER ÉCHANGÉ (Q2 & Q4)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
+                            html.P("Survolez ou cliquez sur les rectangles pour inspecter les flux par catégorie de biens.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
+                        ], className="ms-2")
+                    ], className="d-flex align-items-center mb-2"),
+                    dcc.Graph(id="studio-partner-treemap", figure=init_treemap, config={"displayModeBar": False})
+                ], style={**CARD_STYLE, "marginBottom": "16px"}),
+
+                # Top Products Bar Card
+                html.Div([
+                    html.Div([
+                        create_icon_badge("bi bi-list-ol", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
+                        html.H6("PRINCIPALES MARCHANDISES AU NIVEAU SÉLECTIONNÉ", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
+                    ], className="d-flex align-items-center mb-2"),
+                    dcc.Graph(id="studio-partner-products-bar", figure=init_prod_bar, config={"displayModeBar": False})
+                ], style=CARD_STYLE),
+            ], md=5, sm=12)
+        ])
+    else:
+        # Product Perspective (Q2 & Q3)
+        prod_df = load_product_rankings()
+        prod_options = []
+        if not prod_df.empty:
+            hs2_unique = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
+            prod_options = [
+                {"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:50]}", "value": str(r["hs2_code"])}
+                for _, r in hs2_unique.iterrows()
+            ]
+        default_prod = "87" if any(o["value"] == "87" for o in prod_options) else (prod_options[0]["value"] if prod_options else "87")
+
+        init_p_map, init_p_supp, init_p_kpi, init_p_hist = update_studio_product_perspective(default_prod, "IMPORT", year, "GLOBAL")
+
+        return html.Div([
+            # Product Selector Bar
+            html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Label([
+                            create_icon_badge("bi bi-box-seam", color=PRIMARY, bg="#EFF6FF", size=14, box_size=28),
+                            html.Span("Sélectionnez la Marchandise / Chapitre HS2 à Analyser :", style={"fontWeight": "700", "fontSize": "12px", "color": STATEC_NAVY, "marginLeft": "8px"})
+                        ], className="d-flex align-items-center mb-1"),
+                        dcc.Dropdown(
+                            id="studio-product-dropdown",
+                            options=prod_options,
+                            value=default_prod,
+                            clearable=False,
+                            style={"fontSize": "13px"}
+                        )
+                    ], md=12)
+                ])
+            ], style={"backgroundColor": "#FFFFFF", "borderRadius": "8px", "padding": "12px 16px", "border": f"1px solid {BORDER}", "marginBottom": "16px"}),
+
+            dbc.Row([
+                # Left Column: Supplier Map & Concentration Bar (Q3)
+                dbc.Col([
+                    html.Div([
+                        html.Div([
+                            create_icon_badge("bi bi-pin-map-fill", color=STATEC_BLUE, bg="#DBEAFE", size=16, box_size=32),
+                            html.Div([
+                                html.H6("CARTOGRAPHIE DES FOURNISSEURS / CLIENTS DE CE BIEN (Q3)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px"}),
+                                html.P("Intensité géographique des pays d'origine ou de destination pour le produit sélectionné.", style={"fontSize": "11px", "color": TEXT_MUTED, "marginBottom": "0"}),
+                            ], className="ms-2")
+                        ], className="d-flex align-items-center mb-2"),
+                        dcc.Graph(id="studio-product-map", figure=init_p_map, config={"displayModeBar": False})
+                    ], style={**CARD_STYLE, "marginBottom": "16px"}),
+
+                    html.Div([
+                        html.Div([
+                            create_icon_badge("bi bi-bar-chart-steps", color=PRIMARY, bg="#EFF6FF", size=15, box_size=30),
+                            html.H6("RÉPARTITION DES PAYS SOURCES & PARTS DE MARCHÉ (Q3)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
+                        ], className="d-flex align-items-center mb-2"),
+                        dcc.Graph(id="studio-product-suppliers-bar", figure=init_p_supp, config={"displayModeBar": False})
+                    ], style=CARD_STYLE),
+                ], md=7, sm=12),
+
+                # Right Column: Vulnerability & Historical Shifts (Q2 & Q3)
+                dbc.Col([
+                    html.Div(init_p_kpi, id="studio-product-kpi-container"),
+
+                    html.Div([
+                        html.Div([
+                            create_icon_badge("bi bi-clock-history", color="#059669", bg="#D1FAE5", size=15, box_size=30),
+                            html.H6("ÉVOLUTION HISTORIQUE DE CE BIEN (2000–2024) (Q2)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13px", "marginLeft": "8px"}),
+                        ], className="d-flex align-items-center mb-2"),
+                        dcc.Graph(id="studio-product-history-chart", figure=init_p_hist, config={"displayModeBar": False})
+                    ], style=CARD_STYLE),
+                ], md=5, sm=12)
+            ])
+        ])
+
+
+@callback(
+    Output("studio-world-map", "figure"),
+    Output("studio-top-partners-bar", "figure"),
+    Output("studio-partner-history-chart", "figure"),
+    Input("studio-flow-radio", "value"),
+    Input("global-year-dropdown", "value"),
+    Input("studio-scope-radio", "value"),
+    Input("studio-selected-partner", "data")
+)
+def update_studio_partner_left(flow, year, scope, selected_partner):
     partners_df = load_partner_rankings()
+    selected_partner = selected_partner or "DE"
+    year = int(year or 2024)
+
     sub = partners_df[(partners_df["year"] == year) & (partners_df["flow"] == flow)].copy()
     if sub.empty:
-        # Fallback to latest available year
         avail_years = partners_df["year"].unique()
         if len(avail_years) > 0:
             sub = partners_df[(partners_df["year"] == max(avail_years)) & (partners_df["flow"] == flow)].copy()
 
-    # Determine clicked partner
-    clicked_code = None
-    if click_data and "points" in click_data and click_data["points"]:
-        pt = click_data["points"][0]
-        if "customdata" in pt and pt["customdata"]:
-            clicked_code = pt["customdata"][0]
-        elif "location" in pt:
-            for c2, c3 in ISO2_TO_ISO3.items():
-                if c3 == pt["location"]:
-                    clicked_code = c2
-                    break
+    # Apply Scope
+    if scope == "EU27":
+        sub = sub[sub["partner_code"].isin(list(ISO2_NAMES.keys()))].copy()
+    elif scope == "EXTRA_EU":
+        sub = sub[~sub["partner_code"].isin(["BE", "DE", "FR", "NL", "IT", "ES", "PL", "AT", "SE", "DK", "IE", "PT", "CZ", "HU", "RO", "BG", "HR", "SK", "SI", "LT", "LV", "EE", "CY", "MT", "GR", "FI"])].copy()
 
-    # 1. World/Europe Choropleth Map with ISO3 mapping
-    sub = add_iso3_column(sub)
-    sub_valid = sub.dropna(subset=["iso3"]).copy()
+    # 1. Map Figure
+    sub_map = add_iso3_column(sub)
+    sub_valid = sub_map.dropna(subset=["iso3"]).copy()
 
-    # Determine metric and non-linear scaling for high-contrast visual highlighting
-    if metric == "market_share_pct":
-        sub_valid["color_val"] = np.sqrt(np.maximum(0.01, sub_valid["market_share_pct"]))
-        max_share = max(1.0, sub_valid["market_share_pct"].max())
-        cmin = 0.1
-        cmax = np.sqrt(max_share)
+    sub_valid["color_val"] = np.log10(np.maximum(10000.0, sub_valid["value_eur"]))
+    cmin = 6.0
+    cmax = max(7.0, sub_valid["color_val"].max())
 
-        if flow == "EXPORT":
-            colorscale = [
-                [0.0, "#E0F2FE"], [0.2, "#BAE6FD"], [0.4, "#38BDF8"],
-                [0.65, "#0284C7"], [0.85, "#0066B2"], [1.0, "#001A38"]
-            ]
-        else:
-            colorscale = [
-                [0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"],
-                [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]
-            ]
-
-        tick_shares = [0.5, 1.0, 3.0, 7.0, 15.0, 25.0]
-        tickvals = [np.sqrt(s) for s in tick_shares if np.sqrt(s) <= cmax]
-        ticktext = [f"{s:.1f}%" for s in tick_shares if np.sqrt(s) <= cmax]
-        colorbar_title = "Share (%)"
-    else:
-        # Value in Euros with Log10 scaling to vividly highlight all trading partners
-        sub_valid["color_val"] = np.log10(np.maximum(10000.0, sub_valid["value_eur"]))
-        cmin = 6.0  # €1M baseline
-        cmax = max(7.0, sub_valid["color_val"].max())
-
-        if flow == "EXPORT":
-            colorscale = [
-                [0.0, "#E0F2FE"], [0.2, "#BAE6FD"], [0.4, "#38BDF8"],
-                [0.65, "#0284C7"], [0.85, "#0066B2"], [1.0, "#001A38"]
-            ]
-        else:
-            colorscale = [
-                [0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"],
-                [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]
-            ]
-
-        raw_ticks = [6.0, 7.0, 8.0, 9.0, 9.6]
-        tickvals = [t for t in raw_ticks if t <= cmax + 0.1]
-        raw_labels = ["€1M", "€10M", "€100M", "€1B", "€4B"]
-        ticktext = raw_labels[:len(tickvals)]
-        colorbar_title = f"{flow.capitalize()} (€)"
+    colorscale = [
+        [0.0, "#EDE9FE"], [0.2, "#DDD6FE"], [0.4, "#A78BFA"],
+        [0.65, "#6366F1"], [0.85, "#4338CA"], [1.0, "#1E1B4B"]
+    ] if flow == "IMPORT" else [
+        [0.0, "#E0F2FE"], [0.2, "#BAE6FD"], [0.4, "#38BDF8"],
+        [0.65, "#0284C7"], [0.85, "#0066B2"], [1.0, "#001A38"]
+    ]
 
     fig_map = go.Figure()
-    # Main choropleth layer
+
+    # Base choropleth trace
     fig_map.add_trace(go.Choropleth(
         locations=sub_valid["iso3"],
         z=sub_valid["color_val"],
-        locationmode="ISO-3",
+        text=sub_valid["partner_name"],
+        customdata=np.stack([sub_valid["partner_code"], sub_valid["value_eur"], sub_valid["market_share_pct"]], axis=-1),
+        hovertemplate="<b>%{text} (%{customdata[0]})</b><br>Volume : €%{customdata[1]:,.0f}<br>Part : %{customdata[2]:.2f}%<extra></extra>",
         colorscale=colorscale,
-        zmin=cmin,
-        zmax=cmax,
+        zmin=cmin, zmax=cmax,
         colorbar=dict(
-            title=colorbar_title,
-            tickvals=tickvals,
-            ticktext=ticktext,
-            len=0.65,
-            thickness=12,
-            y=0.5,
-            bgcolor="rgba(255,255,255,0.85)",
-            bordercolor="#CBD5E1",
-            borderwidth=1
-        ),
-        customdata=np.stack([
-            sub_valid["partner_code"],
-            sub_valid["partner_name"],
-            sub_valid["value_eur"],
-            sub_valid["market_share_pct"],
-            sub_valid["rank"]
-        ], axis=-1),
-        hovertemplate="<b>%{customdata[1]}</b> (%{customdata[0]})<br>" +
-                      f"{flow.capitalize()}: €%{{customdata[2]:,.0f}}<br>" +
-                      "Market Share: %{customdata[3]:.2f}%<br>" +
-                      "National Rank: #%{customdata[4]}<br>" +
-                      "<i>💡 Click country to inspect bilateral flows</i><extra></extra>",
-        marker_line_color="#94A3B8",
-        marker_line_width=0.7
-    ))
-
-    # Add Luxembourg Hub Pinpoint
-    fig_map.add_trace(go.Scattergeo(
-        locations=["LUX"],
-        locationmode="ISO-3",
-        mode="markers+text",
-        marker=dict(size=12, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=1.5)),
-        text=["★ Luxembourg"],
-        textposition="top right",
-        textfont=dict(family="'Montserrat', sans-serif", size=11, color=STATEC_NAVY, weight="bold"),
-        hoverinfo="skip",
-        showlegend=False
-    ))
-
-    # Highlight clicked partner country with amber border and pinpoint marker
-    if clicked_code:
-        clicked_iso3 = ISO2_TO_ISO3.get(clicked_code)
-        c_rows = sub_valid[sub_valid["partner_code"] == clicked_code]
-        if clicked_iso3 and not c_rows.empty:
-            c_row = c_rows.iloc[0]
-            c_name = c_row["partner_name"]
-            c_rank = int(c_row["rank"])
-
-            # Glowing gold outline
-            fig_map.add_trace(go.Choropleth(
-                locations=[clicked_iso3],
-                z=[1],
-                locationmode="ISO-3",
-                colorscale=[[0, "#F59E0B"], [1, "#F59E0B"]],
-                marker_line_color="#B45309",
-                marker_line_width=3.5,
-                showscale=False,
-                hoverinfo="skip"
-            ))
-            # Spotlight marker pin
-            fig_map.add_trace(go.Scattergeo(
-                locations=[clicked_iso3],
-                locationmode="ISO-3",
-                mode="markers+text",
-                marker=dict(size=14, color="#F59E0B", symbol="circle", line=dict(color="#FFFFFF", width=2.5)),
-                text=[f"📍 {c_name} (#{c_rank})"],
-                textposition="top center",
-                textfont=dict(family="'Montserrat', sans-serif", size=12, color="#78350F", weight="bold"),
-                hoverinfo="skip",
-                showlegend=False
-            ))
-
-    apply_map_theme(fig_map, scope=scope)
-    fig_map.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
-        clickmode="event+select"
-    )
-
-    # 2. Top 10 Partners
-    top10 = sub.sort_values("rank").head(10).copy()
-    top10 = top10.sort_values("value_eur", ascending=True)
-
-    bar_colors = []
-    for c in top10["partner_code"]:
-        if clicked_code and c == clicked_code:
-            bar_colors.append(WARNING)  # Highlight clicked country
-        else:
-            bar_colors.append(PRIMARY if flow == "EXPORT" else SECONDARY)
-
-    fig_top10 = go.Figure(go.Bar(
-        x=top10["value_eur"] / 1e9,
-        y=top10["partner_name"],
-        orientation="h",
-        marker_color=bar_colors,
-        text=top10["market_share_pct"].apply(lambda p: f"{p:.1f}%"),
-        textposition="outside",
-        hovertemplate="%{y}: €%{x:.2f}B (%{text})<extra></extra>"
-    ))
-    apply_plot_theme(fig_top10, x_title="Billion Euros (€B)")
-    fig_top10.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
-
-    # 3. Evolution over time
-    top_codes = ["DE", "BE", "FR", "NL", "IT", "US", "GB", "CN"]
-    if clicked_code and clicked_code not in top_codes:
-        top_codes.append(clicked_code)
-
-    hist_sub = partners_df[(partners_df["partner_code"].isin(top_codes)) & (partners_df["flow"] == flow)].copy()
-
-    fig_hist = go.Figure()
-    for i, code in enumerate(top_codes):
-        p_data = hist_sub[hist_sub["partner_code"] == code].sort_values("year")
-        if not p_data.empty:
-            p_name = p_data["partner_name"].iloc[0]
-            is_clicked = (code == clicked_code)
-            line_width = 4.5 if is_clicked else 2.5
-            fig_hist.add_trace(go.Scatter(
-                x=p_data["year"], y=p_data["market_share_pct"],
-                name=f"{'⭐ ' if is_clicked else ''}{p_name} ({code})",
-                mode="lines+markers",
-                line=dict(color=WARNING if is_clicked else CATEGORICAL[i % len(CATEGORICAL)], width=line_width),
-                marker=dict(size=8 if is_clicked else 5),
-                hovertemplate=f"{p_name}: %{{y:.1f}}% in %{{x}}<extra></extra>"
-            ))
-    apply_plot_theme(fig_hist, x_title="Year", y_title="Share of Total Trade (%)", dtick_x=2, hovermode="x unified")
-
-    top10_title = f"Top 10 {flow.capitalize()} Partners ({year})"
-    return fig_map, top10_title, fig_top10, fig_hist
-
-
-# Callback for Click Spotlight on Map
-@callback(
-    Output("partner-click-spotlight", "children"),
-    Input("partner-map-graph", "clickData"),
-    Input("partner-flow-radio", "value"),
-    Input("global-year-dropdown", "value")
-)
-def update_partner_click_spotlight(click_data, flow, year):
-    partners_df = load_partner_rankings()
-    sub = partners_df[(partners_df["year"] == year) & (partners_df["flow"] == flow)].copy()
-    if sub.empty:
-        sub = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == flow)].copy()
-
-    selected_code = None
-    if click_data and "points" in click_data and click_data["points"]:
-        pt = click_data["points"][0]
-        if "customdata" in pt and pt["customdata"]:
-            selected_code = pt["customdata"][0]
-        elif "location" in pt:
-            for c2, c3 in ISO2_TO_ISO3.items():
-                if c3 == pt["location"]:
-                    selected_code = c2
-                    break
-
-    is_custom_click = bool(selected_code and not sub[sub["partner_code"] == selected_code].empty)
-    if not is_custom_click:
-        top_row = sub.sort_values("rank").iloc[0]
-        selected_code = top_row["partner_code"]
-
-    partner_row = sub[sub["partner_code"] == selected_code].iloc[0]
-    p_name = partner_row["partner_name"]
-    p_val = partner_row["value_eur"]
-    p_share = partner_row["market_share_pct"]
-    p_rank = int(partner_row["rank"])
-
-    return html.Div([
-        html.Div([
-            html.Div([
-                create_icon_badge("bi bi-geo-alt-fill", color="#B45309", bg="#FEF3C7", size=18, box_size=38),
-                html.Div([
-                    html.Span(
-                        "PAYS SÉLECTIONNÉ SUR LA CARTE :" if is_custom_click else "PARTENAIRE MAJEUR (CLIQUEZ SUR UN PAYS POUR ANALYSER) :",
-                        style={"fontSize": "10.5px", "fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": TEXT_MUTED, "letterSpacing": "0.5px"}
-                    ),
-                    html.H5(f"{p_name} ({selected_code})", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": PRIMARY if flow == 'EXPORT' else SECONDARY, "margin": "1px 0 0 0"}),
-                ], className="ms-3")
-            ], className="d-flex align-items-center"),
-            html.Div([
-                html.Div([
-                    html.Span("VOLUME DU FLUX", style={"fontSize": "10px", "fontWeight": "700", "fontFamily": "'Montserrat', sans-serif", "color": TEXT_MUTED}),
-                    html.H6(fmt_eur(p_val), style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "margin": "0", "color": TEXT_PRIMARY})
-                ], className="me-4 text-center"),
-                html.Div([
-                    html.Span("PART DE MARCHÉ", style={"fontSize": "10px", "fontWeight": "700", "fontFamily": "'Montserrat', sans-serif", "color": TEXT_MUTED}),
-                    html.H6(f"{p_share:.2f}%", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "margin": "0", "color": TEXT_PRIMARY})
-                ], className="me-4 text-center"),
-                html.Div([
-                    html.Span("RANG NATIONAL", style={"fontSize": "10px", "fontWeight": "700", "fontFamily": "'Montserrat', sans-serif", "color": TEXT_MUTED}),
-                    html.H6(f"#{p_rank}", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "margin": "0", "color": PRIMARY if p_rank <= 3 else TEXT_PRIMARY})
-                ], className="me-2 text-center"),
-            ], className="d-flex align-items-center ms-auto flex-wrap")
-        ], className="d-flex align-items-center justify-content-between flex-wrap p-2 px-3 rounded", style={"backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}", "borderLeft": f"4px solid {STATEC_YELLOW}"})
-    ])
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 3: PRODUCT CATEGORIES (Q2)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_products(selected_year):
-    return html.Div([
-        create_section_header(
-            f"STRUCTURE DU COMMERCE PAR PRODUITS ({selected_year})",
-            "Nomenclature douanière du Système Harmonisé (HS2 à 2 chiffres ou HS4 à 4 chiffres). Cartographie Treemap interactive et détection des mutations structurelles.",
-            badge_text="Nomenclature HS Q2",
-            badge_color=STATEC_BLUE,
-            info_title="Nomenclature : Chapitres HS2 vs Sous-Positions HS4",
-            info_content="Le Système Harmonisé (SH) classe les biens physiques de façon pyramidale : les chapitres à 2 chiffres (HS2) regroupent les grandes filières (ex: HS 72 Sidérurgie, HS 87 Véhicules), tandis que le niveau 4 chiffres (HS4) isole les types de produits spécifiques. Cliquez sur les blocs du Treemap pour zoomer dans l'arborescence.",
-            info_icon="bi bi-boxes",
-            info_variant="primary"
-        ),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.Div([
-                        html.Label("FLUX :", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginRight": "10px"}),
-                        dbc.RadioItems(
-                            id="prod-flow-radio",
-                            options=[
-                                {"label": "Exportations", "value": "EXPORT"},
-                                {"label": "Importations", "value": "IMPORT"},
-                            ],
-                            value="EXPORT",
-                            inline=True,
-                            style={"fontSize": "12.5px", "marginRight": "20px"}
-                        ),
-                        html.Label("GRANULARITÉ :", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "11px", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginRight": "10px"}),
-                        dbc.RadioItems(
-                            id="prod-granularity-radio",
-                            options=[
-                                {"label": "2 Chiffres (Chapitres HS2)", "value": 2},
-                                {"label": "4 Chiffres (Sous-positions HS4)", "value": 4},
-                            ],
-                            value=2,
-                            inline=True,
-                            style={"fontSize": "12.5px"}
-                        )
-                    ], className="d-flex align-items-center mb-3 flex-wrap"),
-                    html.H6(id="prod-treemap-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                    dcc.Graph(id="prod-treemap-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=7),
-            dbc.Col([
-                html.Div([
-                    html.H6(id="prod-top10-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginBottom": "12px"}),
-                    dcc.Graph(id="prod-top10-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=5),
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6(id="prod-shift-title", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px", "marginBottom": "4px"}),
-                    html.P("Évolution des lignes clés : Trajectoire séculaire des chapitres industriels et biens stratégiques.", className="text-muted", style={"fontSize": "12px"}),
-                    dcc.Graph(id="prod-shift-graph", config={"displayModeBar": False})
-                ], style=CARD_STYLE)
-            ], md=12)
-        ])
-    ])
-
-
-@callback(
-    Output("prod-treemap-title", "children"),
-    Output("prod-treemap-graph", "figure"),
-    Output("prod-top10-title", "children"),
-    Output("prod-top10-graph", "figure"),
-    Output("prod-shift-title", "children"),
-    Output("prod-shift-graph", "figure"),
-    Input("prod-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("prod-granularity-radio", "value")
-)
-def update_product_tab(flow, year, granularity):
-    if granularity == 4:
-        hs4_df = load_hs4_product_rankings()
-        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].copy()
-        if sub.empty and not hs4_df.empty:
-            sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
-
-        # 1. Multi-level Treemap: Section -> HS2 Chapter -> HS4 Subheading
-        sub["short_name"] = "HS " + sub["hs4_code"].astype(str) + ": " + sub["hs4_name"].apply(lambda s: (s[:28] + "..") if len(s) > 28 else s)
-        sub["chapter_label"] = "Chapter " + sub["hs2_parent"].astype(str)
-        fig_tree = px.treemap(
-            sub,
-            path=["hs_section", "chapter_label", "short_name"],
-            values="value_eur",
-            color="value_eur",
-            color_continuous_scale="Blues" if flow == "EXPORT" else "Purples",
-            hover_data={"value_eur": ":,.0f", "product_share_pct": ":.2f%", "share_in_chapter_pct": ":.1f%"}
+            title="Volume",
+            tickvals=[6, 7, 8, 9, 10],
+            ticktext=["1 M€", "10 M€", "100 M€", "1 Mrd€", "10 Mrd€"],
+            len=0.7, thickness=12, x=0.98, y=0.5
         )
-        fig_tree.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-
-        # 2. Top 15 HS4 Subheadings Bar Chart
-        top15 = sub.sort_values("overall_rank").head(15).copy()
-        top15 = top15.sort_values("value_eur", ascending=True)
-
-        fig_top = go.Figure(go.Bar(
-            x=top15["value_eur"] / 1e6,
-            y=top15["short_name"],
-            orientation="h",
-            marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
-            text=top15.apply(lambda r: f"{r['product_share_pct']:.1f}% ({r['share_in_chapter_pct']:.0f}% of Ch.{r['hs2_parent']})", axis=1),
-            textposition="outside",
-            hovertemplate="%{y}: €%{x:.0f}M (%{text})<extra></extra>"
-        ))
-        apply_plot_theme(fig_top, x_title="Million Euros (€M)")
-        fig_top.update_layout(margin=dict(l=10, r=75, t=10, b=30), yaxis=dict(autorange="reversed"))
-
-        # 3. Top HS4 Shift over time
-        top_codes = top15.sort_values("value_eur", ascending=False).head(8)["hs4_code"].tolist()
-        hist_sub = hs4_df[(hs4_df["hs4_code"].isin(top_codes)) & (hs4_df["flow"] == flow)].copy()
-
-        fig_shift = go.Figure()
-        for i, code in enumerate(top_codes):
-            c_data = hist_sub[hist_sub["hs4_code"] == code].sort_values("year")
-            if not c_data.empty:
-                c_name = c_data["hs4_name"].iloc[0].split(";")[0].title()[:24]
-                fig_shift.add_trace(go.Scatter(
-                    x=c_data["year"], y=c_data["value_eur"] / 1e6,
-                    name=f"HS {code}: {c_name}", mode="lines+markers",
-                    line=dict(color=CATEGORICAL[i % len(CATEGORICAL)], width=2.5),
-                    marker=dict(size=5),
-                    hovertemplate=f"HS {code} ({c_name}): €%{{y:.0f}}M in %{{x}}<extra></extra>"
-                ))
-        apply_plot_theme(fig_shift, x_title="Year", y_title="Million Euros (€M)", dtick_x=1, hovermode="x unified")
-
-        tree_title = f"Hierarchical 4-Digit Product Treemap (Click to Zoom) ({flow.capitalize()} {year})"
-        bar_title = f"Top 15 Traded 4-Digit Goods ({year})"
-        shift_title = f"Evolution of Top 4-Digit Products Over Time (Million €)"
-        return tree_title, fig_tree, bar_title, fig_top, shift_title, fig_shift
-
-    # Standard 2-digit macro view
-    prods_df = load_product_rankings()
-    sub = prods_df[(prods_df["year"] == year) & (prods_df["flow"] == flow)].copy()
-    if sub.empty:
-        avail_years = prods_df["year"].unique()
-        if len(avail_years) > 0:
-            sub = prods_df[(prods_df["year"] == max(avail_years)) & (prods_df["flow"] == flow)].copy()
-
-    # 1. Treemap
-    sub["short_name"] = sub["hs2_name"].apply(lambda s: (s[:32] + "..") if len(s) > 32 else s)
-    fig_tree = px.treemap(
-        sub,
-        path=["hs_section", "short_name"],
-        values="value_eur",
-        color="value_eur",
-        color_continuous_scale="Blues" if flow == "EXPORT" else "Purples",
-        hover_data={"value_eur": ":,.0f", "product_share_pct": ":.2f%"}
-    )
-    fig_tree.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-
-    # 2. Top 10 HS2 Chapters Bar Chart
-    top10 = sub.sort_values("rank").head(10).copy()
-    top10 = top10.sort_values("value_eur", ascending=True)
-
-    fig_top10 = go.Figure(go.Bar(
-        x=top10["value_eur"] / 1e6,
-        y=top10["short_name"],
-        orientation="h",
-        marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
-        text=top10["product_share_pct"].apply(lambda p: f"{p:.1f}%"),
-        textposition="outside",
-        hovertemplate="%{y}: €%{x:.0f}M (%{text})<extra></extra>"
     ))
-    apply_plot_theme(fig_top10, x_title="Million Euros (€M)")
-    fig_top10.update_layout(margin=dict(l=10, r=40, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    # 3. Structural Shifts
-    key_chapters = ["72", "73", "84", "85", "87", "39", "30", "27"]
-    hist_sub = prods_df[(prods_df["hs2_code"].isin(key_chapters)) & (prods_df["flow"] == flow)].copy()
+    # Luxembourg Hub Pinpoint
+    fig_map.add_trace(go.Scattergeo(
+        lon=[6.13], lat=[49.61],
+        mode="markers+text",
+        marker=dict(size=14, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=2)),
+        text=["★ Luxembourg"],
+        textposition="top center",
+        textfont=dict(size=11, family="Montserrat", color=STATEC_NAVY),
+        hoverinfo="text",
+        name="Luxembourg (Hub)"
+    ))
 
-    fig_shift = go.Figure()
-    for i, code in enumerate(key_chapters):
-        c_data = hist_sub[hist_sub["hs2_code"] == code].sort_values("year")
-        if not c_data.empty:
-            c_name = c_data["hs2_name"].iloc[0].split(";")[0].title()[:24]
-            fig_shift.add_trace(go.Scatter(
-                x=c_data["year"], y=c_data["product_share_pct"],
-                name=f"HS {code}: {c_name}", mode="lines+markers",
-                line=dict(color=CATEGORICAL[i % len(CATEGORICAL)], width=2.5),
-                marker=dict(size=5),
-                hovertemplate=f"HS {code} ({c_name}): %{{y:.1f}}% in %{{x}}<extra></extra>"
-            ))
-    apply_plot_theme(fig_shift, x_title="Year", y_title="Share of Total (%)", dtick_x=2, hovermode="x unified")
+    # Selected Partner Golden Ring Highlight
+    sel_iso3 = ISO2_TO_ISO3.get(selected_partner)
+    if sel_iso3:
+        fig_map.add_trace(go.Choropleth(
+            locations=[sel_iso3],
+            z=[cmax],
+            colorscale=[[0.0, STATEC_YELLOW], [1.0, STATEC_YELLOW]],
+            showscale=False,
+            hoverinfo="skip",
+            marker_line_color=STATEC_YELLOW,
+            marker_line_width=3.5,
+        ))
 
-    tree_title = f"Product Tree by HS Section & Chapter ({flow.capitalize()} {year})"
-    bar_title = f"Top 10 Traded Product Chapters ({year})"
-    shift_title = "Structural Shifts in Product Composition (2000 vs Recent)"
-    return tree_title, fig_tree, bar_title, fig_top10, shift_title, fig_shift
+    apply_map_theme(fig_map, scope="world" if scope != "EU27" else "europe")
+    fig_map.update_layout(
+        title=dict(text=f"Planisphère des Partenaires ({year})", font=dict(family="Montserrat", size=13, color=STATEC_NAVY)),
+        height=430,
+        margin=dict(l=10, r=10, t=35, b=10)
+    )
 
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# TAB 4: PRODUCT & PARTNER DEEP-DIVE (Q3 & Q4)
-# ───────────────────────────────────────────────────────────────────────────
-def render_tab_drilldown(selected_year):
-    # Load product partner list
-    pp_df = load_product_partners()
-    product_options = []
-    if not pp_df.empty:
-        distinct_prods = pp_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
-        product_options = [{"label": f"HS {r['hs2_code']}: {r['hs2_name'][:50]}", "value": r['hs2_code']} for _, r in distinct_prods.iterrows()]
-
-    # Load partner list
-    lvl2_df = load_drilldown_lvl2()
-    partner_options = []
-    if not lvl2_df.empty:
-        distinct_partners = lvl2_df[["partner_code", "partner_name"]].drop_duplicates().sort_values("partner_name")
-        partner_options = [{"label": f"{r['partner_name']} ({r['partner_code']})", "value": r['partner_code']} for _, r in distinct_partners.iterrows()]
-
-    return html.Div([
-        create_section_header(
-            f"DRILL-DOWN TARIFAIRE HIÉRARCHIQUE ({selected_year})",
-            "Exploration fine de la nomenclature douanière : des chapitres HS2 (2 chiffres) aux positions HS4 (4 chiffres) et codes détaillés NC8 (8 chiffres).",
-            badge_text="Eurostat Q3 & Q4",
-            badge_color=STATEC_NAVY,
-            info_title="Navigation Tarifaire : De la Vue d'Ensemble au Détail CN8",
-            info_content="La Partie A (Q3) révèle les pays fournisseurs ou clients dominants et leur indice HHI pour chaque produit. La Partie B (Q4) permet aux analystes de décomposer les échanges bilatéraux avec n'importe quel partenaire jusqu'au code tarifaire le plus fin (NC8 à 8 chiffres).",
-            info_icon="🔍",
-            info_variant="navy"
-        ),
-        # Sub-tabs within Tab 4
-        dbc.Tabs(id="drilldown-subtabs", active_tab="subtab-q3", children=[
-            dbc.Tab(label="PARTIE A : PARTENAIRES PAR PRODUIT (Q3)", tab_id="subtab-q3",
-                    label_style={"fontWeight": "700", "fontFamily": "'Montserrat', sans-serif", "fontSize": "12px", "color": STATEC_GRAY, "padding": "8px 16px"},
-                    active_label_style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "12px", "color": STATEC_NAVY, "borderBottom": f"3px solid {STATEC_YELLOW}", "backgroundColor": "transparent"}),
-            dbc.Tab(label="PARTIE B : DÉCOMPOSITION PAR PAYS HS2→CN8 (Q4)", tab_id="subtab-q4",
-                    label_style={"fontWeight": "700", "fontFamily": "'Montserrat', sans-serif", "fontSize": "12px", "color": STATEC_GRAY, "padding": "8px 16px"},
-                    active_label_style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "fontSize": "12px", "color": STATEC_NAVY, "borderBottom": f"3px solid {STATEC_YELLOW}", "backgroundColor": "transparent"}),
-        ], className="mb-4", style={"borderBottom": "2px solid #E2E8F0"}),
-
-        # Sub-tab Content
-        html.Div(id="drilldown-subtab-content")
-    ])
-
-
-@callback(
-    Output("drilldown-subtab-content", "children"),
-    Input("drilldown-subtabs", "active_tab"),
-    Input("global-year-dropdown", "value")
-)
-def render_drilldown_subtab(subtab, year):
-    if subtab == "subtab-q3":
-        pp_df = load_product_partners()
-        product_options = []
-        if not pp_df.empty:
-            distinct_prods = pp_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
-            product_options = [{"label": f"HS {r['hs2_code']}: {r['hs2_name'][:50]}", "value": r['hs2_code']} for _, r in distinct_prods.iterrows()]
-
-        default_prod = "84" if any(p["value"] == "84" for p in product_options) else (product_options[0]["value"] if product_options else None)
-
-        return html.Div([
-            dbc.Row([
-                dbc.Col([
-                    html.Div([
-                        html.H6("PRINCIPAUX PARTENAIRES POUR UN PRODUIT (Q3)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                        html.P(
-                            "Sélectionnez un chapitre douanier (HS2) pour révéler les pays fournisseurs ou clients dominants, leurs parts de marché et l'indice de concentration (HHI).",
-                            className="text-muted", style={"fontSize": "12px"}
-                        ),
-                        dbc.Row([
-                            dbc.Col([
-                                html.Label("Select Product Category (HS2):", style={"fontSize": "12px", "fontWeight": "700"}),
-                                dcc.Dropdown(
-                                    id="q3-product-dropdown",
-                                    options=product_options,
-                                    value=default_prod,
-                                    clearable=False,
-                                    style={"fontSize": "13px"}
-                                )
-                            ], md=6),
-                            dbc.Col([
-                                html.Label("Trade Flow Direction:", style={"fontSize": "12px", "fontWeight": "700"}),
-                                dbc.RadioItems(
-                                    id="q3-flow-radio",
-                                    options=[
-                                        {"label": "Imports (Suppliers)", "value": "IMPORT"},
-                                        {"label": "Exports (Destinations)", "value": "EXPORT"},
-                                    ],
-                                    value="IMPORT",
-                                    inline=True,
-                                    style={"fontSize": "13px", "marginTop": "6px"}
-                                )
-                            ], md=6),
-                        ], className="mb-3"),
-
-                        html.Div(id="q3-badge-container", className="mb-3"),
-                        dcc.Graph(id="q3-partner-bar-graph", config={"displayModeBar": False}),
-                    ], style=CARD_STYLE)
-                ], md=7),
-                dbc.Col([
-                    html.Div([
-                        dbc.Row([
-                            dbc.Col([
-                                html.H6("Geographic Partner Distribution", style={"fontWeight": "700", "marginBottom": "0"}),
-                            ], md=7),
-                            dbc.Col([
-                                dbc.RadioItems(
-                                    id="q3-map-scope",
-                                    options=[
-                                        {"label": "🇪🇺 Europe", "value": "europe"},
-                                        {"label": "🌍 World", "value": "world"},
-                                    ],
-                                    value="europe",
-                                    inline=True,
-                                    style={"fontSize": "12px"}
-                                )
-                            ], md=5, className="text-end"),
-                        ], className="align-items-center mb-2"),
-                        dcc.Graph(id="q3-partner-map-graph", config={"displayModeBar": True, "scrollZoom": True}, style={"height": "350px"}),
-                        html.Div(id="q3-map-spotlight", className="mt-2")
-                    ], style=CARD_STYLE)
-                ], md=5),
-            ])
-        ])
-
-    else:
-        # Sub-tab Q4
-        lvl2_df = load_drilldown_lvl2()
-        partner_options = []
-        if not lvl2_df.empty:
-            distinct_partners = lvl2_df[["partner_code", "partner_name"]].drop_duplicates().sort_values("partner_name")
-            partner_options = [{"label": f"{r['partner_name']} ({r['partner_code']})", "value": r['partner_code']} for _, r in distinct_partners.iterrows()]
-
-        default_partner = "DE" if any(p["value"] == "DE" for p in partner_options) else (partner_options[0]["value"] if partner_options else None)
-
-        return html.Div([
-            dbc.Row([
-                dbc.Col([
-                    html.Div([
-                        html.H6("DÉCOMPOSITION HIÉRARCHIQUE DES FLUX PAR PAYS PARTENAIRE (Q4)", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "letterSpacing": "0.4px"}),
-                        html.P(
-                            "Navigation multi-niveaux à travers les lignes tarifaires douanières : des chapitres HS2 aux sous-positions HS4 et aux codes détaillés à 8 chiffres CN8.",
-                            className="text-muted", style={"fontSize": "12px"}
-                        ),
-                        dbc.Row([
-                            dbc.Col([
-                                html.Label("Select Trading Partner:", style={"fontSize": "12px", "fontWeight": "700"}),
-                                dcc.Dropdown(
-                                    id="q4-partner-dropdown",
-                                    options=partner_options,
-                                    value=default_partner,
-                                    clearable=False,
-                                    style={"fontSize": "13px"}
-                                )
-                            ], md=4),
-                            dbc.Col([
-                                html.Label("Flow Direction:", style={"fontSize": "12px", "fontWeight": "700"}),
-                                dbc.RadioItems(
-                                    id="q4-flow-radio",
-                                    options=[
-                                        {"label": "Imports", "value": "IMPORT"},
-                                        {"label": "Exports", "value": "EXPORT"},
-                                    ],
-                                    value="IMPORT",
-                                    inline=True,
-                                    style={"fontSize": "13px", "marginTop": "6px"}
-                                )
-                            ], md=4),
-                            dbc.Col([
-                                html.Label("Granularity Level:", style={"fontSize": "12px", "fontWeight": "700"}),
-                                dbc.RadioItems(
-                                    id="q4-level-radio",
-                                    options=[
-                                        {"label": "2-Digit (HS2)", "value": 2},
-                                        {"label": "4-Digit (HS4)", "value": 4},
-                                        {"label": "8-Digit (CN8)", "value": 8},
-                                    ],
-                                    value=2,
-                                    inline=True,
-                                    style={"fontSize": "13px", "marginTop": "6px"}
-                                )
-                            ], md=4),
-                        ], className="mb-3"),
-
-                        dcc.Graph(id="q4-drilldown-bar-graph", config={"displayModeBar": False}),
-                    ], style=CARD_STYLE)
-                ], md=12)
-            ])
-        ])
-
-
-# Callback for Q3 (Principal partners for a product)
-@callback(
-    Output("q3-badge-container", "children"),
-    Output("q3-partner-bar-graph", "figure"),
-    Output("q3-partner-map-graph", "figure"),
-    Output("q3-map-spotlight", "children"),
-    Input("q3-product-dropdown", "value"),
-    Input("q3-flow-radio", "value"),
-    Input("global-year-dropdown", "value"),
-    Input("q3-map-scope", "value"),
-    Input("q3-partner-map-graph", "clickData")
-)
-def update_q3_product_partners(product_code, flow, year, map_scope, click_data):
-    if not product_code:
-        return html.Div(), go.Figure(), go.Figure(), html.Div()
-
-    pp_df = load_product_partners()
-    # Normalize product_code string
-    product_code = str(product_code).zfill(2)
-    sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year)].copy()
-    if sub.empty:
-        # Fallback to latest available year in product partners
-        avail_years = pp_df["year"].unique()
-        if len(avail_years) > 0:
-            year_used = max(avail_years)
-            sub = pp_df[(pp_df["hs2_code"] == product_code) & (pp_df["flow"] == flow) & (pp_df["year"] == year_used)].copy()
-        else:
-            return html.Div("No data for this product."), go.Figure(), go.Figure(), html.Div()
-
-    if sub.empty:
-        return html.Div("No data found for this selection."), go.Figure(), go.Figure(), html.Div()
-
-    # Product metadata
-    prod_name = sub["hs2_name"].iloc[0]
-    total_val = sub["total_eur"].iloc[0]
-    hhi_score = sub["hhi"].iloc[0]
-
-    # Look up top 3 HS4 subheadings for this chapter
-    hs4_df = load_hs4_product_rankings()
-    sub_hs4 = hs4_df[(hs4_df["hs2_parent"] == product_code) & (hs4_df["flow"] == flow) & (hs4_df["year"] == year)].copy()
-    if sub_hs4.empty and not hs4_df.empty:
-        sub_hs4 = hs4_df[(hs4_df["hs2_parent"] == product_code) & (hs4_df["flow"] == flow) & (hs4_df["year"] == hs4_df["year"].max())].copy()
-
-    hs4_pills = []
-    if not sub_hs4.empty:
-        top3_hs4 = sub_hs4.sort_values("value_eur", ascending=False).head(3)
-        hs4_pills = [
-            html.Div([
-                html.Span("Leading 4-Digit Lines:", style={"fontSize": "11px", "fontWeight": "700", "color": TEXT_MUTED, "marginRight": "8px"}),
-            ] + [
-                html.Span(
-                    f"HS {r['hs4_code']}: {r['hs4_name'][:25]} ({r['share_in_chapter_pct']:.0f}% of ch.)",
-                    style={
-                        "backgroundColor": "#F8FAFC", "color": TEXT_PRIMARY, "padding": "3px 9px",
-                        "borderRadius": "12px", "fontSize": "11px", "fontWeight": "600",
-                        "marginRight": "6px", "border": f"1px solid {BORDER}", "marginBottom": "4px"
-                    }
-                ) for _, r in top3_hs4.iterrows()
-            ], className="d-flex align-items-center flex-wrap mt-2")
-        ]
-
-    # Badge ribbon
-    badge_html = html.Div([
-        html.Div([
-            html.Span(f"Total {flow.capitalize()}: {fmt_eur(total_val)}", style={
-                "backgroundColor": "#EFF6FF", "color": "#1D4ED8", "padding": "5px 12px",
-                "borderRadius": "20px", "fontWeight": "700", "fontSize": "12px", "marginRight": "10px",
-                "border": "1px solid #BFDBFE"
-            }),
-            get_concentration_badge(hhi_score),
-        ], className="d-flex align-items-center"),
-    ] + hs4_pills)
-
-    # Determine clicked partner
-    clicked_p_code = None
-    if click_data and "points" in click_data and click_data["points"]:
-        pt = click_data["points"][0]
-        if "customdata" in pt and pt["customdata"]:
-            clicked_p_code = pt["customdata"][0]
-        elif "location" in pt:
-            for c2, c3 in ISO2_TO_ISO3.items():
-                if c3 == pt["location"]:
-                    clicked_p_code = c2
-                    break
-
-    # Top 10 partners bar chart
-    top10 = sub.sort_values("value_eur", ascending=False).head(10).copy()
-    top10 = top10.sort_values("value_eur", ascending=True)
-
-    bar_colors = []
-    for c in top10["partner_code"]:
-        if clicked_p_code and c == clicked_p_code:
-            bar_colors.append(WARNING)
-        else:
-            bar_colors.append(PRIMARY if flow == "EXPORT" else SECONDARY)
+    # 2. Top 10 Partners Bar Chart
+    top10 = sub.sort_values("value_eur", ascending=True).tail(10).copy()
+    bar_colors = [STATEC_YELLOW if r["partner_code"] == selected_partner else (PRIMARY if flow == "EXPORT" else SECONDARY) for _, r in top10.iterrows()]
 
     fig_bar = go.Figure(go.Bar(
         x=top10["value_eur"] / 1e6,
-        y=top10["partner_name"],
+        y=[f"{r['partner_name']} ({r['partner_code']})" for _, r in top10.iterrows()],
         orientation="h",
         marker_color=bar_colors,
-        text=top10["partner_share_pct"].apply(lambda p: f"{p:.1f}%"),
+        customdata=top10["partner_code"],
+        text=[f"€{v/1e6:.1f}M ({s:.1f}%)" for v, s in zip(top10["value_eur"], top10["market_share_pct"])],
         textposition="outside",
-        hovertemplate="%{y}: €%{x:.1f}M (%{text})<extra></extra>"
+        hovertemplate="<b>%{y}</b><br>Volume : €%{x:.1f}M<extra></extra>"
     ))
-    apply_plot_theme(fig_bar, title=f"Top 10 Partners for HS {product_code}: {prod_name[:35]}", x_title="Million Euros (€M)")
-    fig_bar.update_layout(margin=dict(l=10, r=40, t=35, b=30), yaxis=dict(autorange="reversed"))
+    apply_plot_theme(fig_bar, title=f"Top 10 Partenaires en {year} (€M)", x_title="Millions d'Euros (€M)")
+    fig_bar.update_layout(height=320, margin=dict(l=10, r=60, t=35, b=30), yaxis=dict(autorange="reversed"))
 
-    # Map of partners with ISO3 mapping
-    sub = add_iso3_column(sub)
-    sub_valid = sub.dropna(subset=["iso3"]).copy()
+    # 3. Bilateral Historical Trade Trend (2000-2024)
+    hist_sub = partners_df[(partners_df["partner_code"] == selected_partner) & (partners_df["flow"] == flow)].sort_values("year")
+    fig_hist = go.Figure()
+    if not hist_sub.empty:
+        fig_hist.add_trace(go.Scatter(
+            x=hist_sub["year"],
+            y=hist_sub["value_eur"] / 1e6,
+            mode="lines+markers",
+            line=dict(color=PRIMARY if flow == "EXPORT" else SECONDARY, width=3),
+            marker=dict(size=6, color=STATEC_YELLOW, line=dict(color=STATEC_NAVY, width=1.5)),
+            fill="tozeroy",
+            fillcolor="rgba(0, 102, 178, 0.08)" if flow == "EXPORT" else "rgba(67, 56, 202, 0.08)",
+            hovertemplate="Année %{x}<br>Volume : €%{y:,.1f}M<extra></extra>"
+        ))
+    partner_name = get_country_name(selected_partner)
+    apply_plot_theme(fig_hist, title=f"Évolution des Échanges avec {partner_name} (2000–2024)", x_title="Année", y_title="M€")
+    fig_hist.update_layout(height=260, margin=dict(l=10, r=20, t=35, b=30))
 
-    # Logarithmic scale for product supplier values to ensure all partners are distinctly visible
-    sub_valid["color_val"] = np.log10(np.maximum(10000.0, sub_valid["value_eur"]))
-    cmin = 5.0  # €100k
-    cmax = max(6.5, sub_valid["color_val"].max())
-
-    if flow == "EXPORT":
-        colorscale = [
-            [0.0, "#BAE6FD"], [0.2, "#7DD3FC"], [0.4, "#38BDF8"],
-            [0.65, "#0284C7"], [0.85, "#1D4ED8"], [1.0, "#0F172A"]
-        ]
-    else:
-        colorscale = [
-            [0.0, "#DDD6FE"], [0.2, "#C4B5FD"], [0.4, "#A78BFA"],
-            [0.65, "#7C3AED"], [0.85, "#6D28D9"], [1.0, "#2E1065"]
-        ]
-
-    raw_ticks = [5.0, 6.0, 7.0, 8.0, 9.0]
-    tickvals = [t for t in raw_ticks if t <= cmax + 0.1]
-    raw_labels = ["€100k", "€1M", "€10M", "€100M", "€1B"]
-    ticktext = raw_labels[:len(tickvals)]
-
-    fig_map = go.Figure()
-    fig_map.add_trace(go.Choropleth(
-        locations=sub_valid["iso3"],
-        z=sub_valid["color_val"],
-        locationmode="ISO-3",
-        colorscale=colorscale,
-        zmin=cmin,
-        zmax=cmax,
-        colorbar=dict(
-            title=f"€ {flow.capitalize()}",
-            tickvals=tickvals,
-            ticktext=ticktext,
-            len=0.6,
-            thickness=10,
-            y=0.5
-        ),
-        customdata=np.stack([
-            sub_valid["partner_code"],
-            sub_valid["partner_name"],
-            sub_valid["value_eur"],
-            sub_valid["partner_share_pct"],
-            sub_valid["rank"]
-        ], axis=-1),
-        hovertemplate="<b>%{customdata[1]}</b> (%{customdata[0]})<br>" +
-                      f"{flow.capitalize()}: €%{{customdata[2]:,.0f}}<br>" +
-                      "Product Category Share: %{customdata[3]:.1f}%<br>" +
-                      "Supplier Rank: #%{customdata[4]}<br>" +
-                      "<i>💡 Click country to inspect</i><extra></extra>",
-        marker_line_color="#94A3B8",
-        marker_line_width=0.7
-    ))
-
-    # Highlight clicked partner country with amber border and pinpoint marker
-    if clicked_p_code:
-        clicked_iso3 = ISO2_TO_ISO3.get(clicked_p_code)
-        c_rows = sub_valid[sub_valid["partner_code"] == clicked_p_code]
-        if clicked_iso3 and not c_rows.empty:
-            c_row = c_rows.iloc[0]
-            c_name = c_row["partner_name"]
-            c_rank = int(c_row["rank"])
-
-            # Glowing gold outline
-            fig_map.add_trace(go.Choropleth(
-                locations=[clicked_iso3],
-                z=[1],
-                locationmode="ISO-3",
-                colorscale=[[0, "#F59E0B"], [1, "#F59E0B"]],
-                marker_line_color="#B45309",
-                marker_line_width=3.5,
-                showscale=False,
-                hoverinfo="skip"
-            ))
-            # Spotlight marker pin
-            fig_map.add_trace(go.Scattergeo(
-                locations=[clicked_iso3],
-                locationmode="ISO-3",
-                mode="markers+text",
-                marker=dict(size=14, color="#F59E0B", symbol="circle", line=dict(color="#FFFFFF", width=2.5)),
-                text=[f"📍 {c_name} (#{c_rank})"],
-                textposition="top center",
-                textfont=dict(family="Inter, sans-serif", size=12, color="#78350F", weight="bold"),
-                hoverinfo="skip",
-                showlegend=False
-            ))
-
-    fig_map.update_geos(
-        showcoastlines=True, coastlinecolor="#CBD5E1",
-        showland=True, landcolor="#F1F5F9",
-        showocean=True, oceancolor="#E0F2FE",
-        showcountries=True, countrycolor="#CBD5E1",
-        scope=map_scope if map_scope else "europe",
-        projection_type="natural earth" if map_scope == "world" else "mercator"
-    )
-    fig_map.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0),
-        clickmode="event+select"
-    )
-
-    # Spotlight text below map
-    if clicked_p_code and not sub[sub["partner_code"] == clicked_p_code].empty:
-        r_match = sub[sub["partner_code"] == clicked_p_code].iloc[0]
-        spotlight_elem = html.Div([
-            html.Strong(f"📍 {r_match['partner_name']} ({clicked_p_code}): ", style={"color": PRIMARY if flow == 'EXPORT' else SECONDARY, "fontSize": "12px"}),
-            html.Span(f"{fmt_eur(r_match['value_eur'])} ({r_match['partner_share_pct']:.1f}% of HS {product_code} {flow.lower()}s, Rank #{int(r_match['rank'])})", style={"fontSize": "12px", "color": TEXT_PRIMARY})
-        ], className="p-2 rounded mt-1", style={"backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}"})
-    else:
-        top_match = sub.sort_values("value_eur", ascending=False).iloc[0] if not sub.empty else None
-        if top_match is not None:
-            spotlight_elem = html.Div([
-                html.Span(f"📍 Lead Partner: {top_match['partner_name']} ({top_match['partner_code']}) — {fmt_eur(top_match['value_eur'])} ({top_match['partner_share_pct']:.1f}%). ", style={"fontSize": "11px", "color": TEXT_MUTED}),
-                html.Span("💡 Click any country on the map to inspect its supply share.", style={"fontSize": "11px", "color": PRIMARY, "fontWeight": "600"})
-            ], className="p-2 rounded mt-1", style={"backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}"})
-        else:
-            spotlight_elem = html.Div()
-
-    return badge_html, fig_bar, fig_map, spotlight_elem
+    return fig_map, fig_bar, fig_hist
 
 
-# Callback for Q4 (Hierarchical partner drilldown)
 @callback(
-    Output("q4-drilldown-bar-graph", "figure"),
-    Input("q4-partner-dropdown", "value"),
-    Input("q4-flow-radio", "value"),
-    Input("q4-level-radio", "value")
+    Output("studio-partner-spotlight-container", "children"),
+    Output("studio-partner-treemap", "figure"),
+    Output("studio-partner-products-bar", "figure"),
+    Input("studio-selected-partner", "data"),
+    Input("studio-flow-radio", "value"),
+    Input("global-year-dropdown", "value"),
+    Input("studio-granularity-radio", "value")
 )
-def update_q4_drilldown_chart(partner, flow, level):
-    if not partner:
-        return go.Figure()
+def update_studio_partner_right(selected_partner, flow, year, granularity):
+    selected_partner = selected_partner or "DE"
+    granularity = int(granularity or 2)
+    partner_name = get_country_name(selected_partner)
+    year = int(year or 2024)
 
-    if level == 2:
-        df = load_drilldown_lvl2()
-        sub = df[(df["partner_code"] == partner) & (df["flow"] == flow)].copy()
-        sub = sub.sort_values("value_eur", ascending=True).tail(15)
-        y_col = "product_name"
-    elif level == 4:
-        df = load_drilldown_lvl4()
-        sub = df[(df["partner_code"] == partner) & (df["flow"] == flow)].copy()
-        sub = sub.sort_values("value_eur", ascending=True).tail(15)
-        sub["short_name"] = sub["product_code"].astype(str) + ": " + sub["product_name"].apply(lambda s: s[:45] + ".." if len(s) > 45 else s)
-        y_col = "short_name"
+    # 1. Partner Metrics
+    partners_df = load_partner_rankings()
+    sub_p = partners_df[(partners_df["partner_code"] == selected_partner) &
+                        (partners_df["flow"] == flow) &
+                        (partners_df["year"] == year)]
+    if sub_p.empty:
+        sub_p = partners_df[(partners_df["partner_code"] == selected_partner) & (partners_df["flow"] == flow)]
+        if not sub_p.empty:
+            sub_p = sub_p[sub_p["year"] == sub_p["year"].max()]
+
+    val_eur = sub_p["value_eur"].values[0] if not sub_p.empty else 0.0
+    share_pct = sub_p["market_share_pct"].values[0] if not sub_p.empty else 0.0
+    rank = int(sub_p["rank"].values[0]) if not sub_p.empty and "rank" in sub_p.columns else 1
+
+    # 2. Extract Partner Products
+    prod_sub, is_fallback, level_label = get_partner_products(selected_partner, flow, year, level=granularity)
+
+    # Spotlight Header
+    badge_color = SUCCESS if rank <= 3 else (PRIMARY if rank <= 10 else STATEC_GRAY)
+    flow_text = "Fournisseur" if flow == "IMPORT" else "Client"
+
+    spotlight = html.Div([
+        html.Div([
+            html.Div([
+                create_icon_badge("bi bi-flag-fill", color="#B45309", bg="#FEF3C7", size=18, box_size=38),
+                html.Div([
+                    html.Div([
+                        html.Span(f"{partner_name.upper()} ({selected_partner})", style={
+                            "fontSize": "16px", "fontWeight": "900", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY
+                        }),
+                        html.Span(f"#{rank} {flow_text}", className="badge ms-2", style={"backgroundColor": badge_color, "color": "#FFFFFF", "fontSize": "11px", "fontWeight": "700"}),
+                    ]),
+                    html.Span(f"Volume d'échange : {fmt_eur(val_eur)} • {share_pct:.1f}% des {flow.lower()}s du Luxembourg", style={
+                        "fontSize": "12px", "color": TEXT_MUTED, "fontWeight": "600"
+                    })
+                ], className="ms-2")
+            ], className="d-flex align-items-center"),
+
+            # Depth Indicator
+            html.Div([
+                html.Span(level_label, className="badge", style={
+                    "backgroundColor": "#EFF6FF", "color": PRIMARY, "border": "1px solid #BFDBFE", "fontSize": "10.5px", "fontWeight": "700"
+                })
+            ])
+        ], className="d-flex align-items-center justify-content-between"),
+
+        # Fallback Alert if applicable
+        html.Div([
+            html.I(className="bi bi-info-circle-fill me-1 text-warning"),
+            html.Span("Drill-down CN8 à 8 chiffres disponible pour le Top 5 partenaires (DE, BE, FR, NL, US). Pour les autres partenaires mondiaux, affichage universel au niveau HS2 (Chapitres).", style={"fontSize": "11px", "color": "#92400E"})
+        ], className="mt-2 p-2 rounded", style={"backgroundColor": "#FFFBEB", "border": "1px solid #FCD34D"}) if is_fallback else html.Div()
+    ], style={
+        "backgroundColor": "#FFFFFF", "borderRadius": "10px", "padding": "14px 16px",
+        "boxShadow": "0 2px 6px rgba(0,0,0,0.04)", "border": f"1px solid {BORDER}",
+        "borderLeft": f"4px solid {STATEC_YELLOW}", "marginBottom": "16px"
+    })
+
+    # 3. Treemap Figure
+    if prod_sub.empty:
+        fig_treemap = go.Figure()
+        fig_treemap.add_annotation(text="Aucun détail produit disponible pour ce pays", showarrow=False)
+        apply_plot_theme(fig_treemap)
+        fig_treemap.update_layout(height=360)
+
+        fig_prod_bar = go.Figure()
+        apply_plot_theme(fig_prod_bar)
+        fig_prod_bar.update_layout(height=300)
     else:
-        df = load_drilldown_lvl8()
-        sub = df[(df["partner_code"] == partner) & (df["flow"] == flow)].copy()
-        sub = sub.sort_values("value_eur", ascending=True).tail(15)
-        sub["short_name"] = sub["product_code"].astype(str) + ": " + sub["product_name"].apply(lambda s: s[:45] + ".." if len(s) > 45 else s)
-        y_col = "short_name"
+        top_prods = prod_sub.head(25).copy()
+        fig_treemap = px.treemap(
+            top_prods,
+            path=["short_name"],
+            values="value_eur",
+            color="value_eur",
+            color_continuous_scale="Viridis" if flow == "IMPORT" else "Blues"
+        )
+        fig_treemap.update_traces(
+            hovertemplate="<b>%{label}</b><br>Valeur : €%{value:,.0f}<extra></extra>",
+            textinfo="label+value"
+        )
+        apply_plot_theme(fig_treemap, title=f"Panier de Biens — {partner_name} ({len(top_prods)} flux)")
+        fig_treemap.update_layout(height=370, margin=dict(l=10, r=10, t=35, b=10), coloraxis_showscale=False)
+
+        # 4. Top Products Horizontal Bar Chart
+        bar_sub = prod_sub.head(10).sort_values("value_eur", ascending=True)
+        fig_prod_bar = go.Figure(go.Bar(
+            x=bar_sub["value_eur"] / 1e6,
+            y=bar_sub["short_name"],
+            orientation="h",
+            marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
+            text=[fmt_eur(v) for v in bar_sub["value_eur"]],
+            textposition="outside",
+            hovertemplate="<b>%{y}</b><br>Valeur : €%{x:.2f}M<extra></extra>"
+        ))
+        apply_plot_theme(fig_prod_bar, title=f"Top Marchandises avec {partner_name} ({level_label.split(' ')[0]})", x_title="Millions d'Euros (€M)")
+        fig_prod_bar.update_layout(height=320, margin=dict(l=10, r=50, t=35, b=25), yaxis=dict(autorange="reversed"))
+
+    return spotlight, fig_treemap, fig_prod_bar
+
+
+@callback(
+    Output("studio-product-map", "figure"),
+    Output("studio-product-suppliers-bar", "figure"),
+    Output("studio-product-kpi-container", "children"),
+    Output("studio-product-history-chart", "figure"),
+    Input("studio-product-dropdown", "value"),
+    Input("studio-flow-radio", "value"),
+    Input("global-year-dropdown", "value"),
+    Input("studio-scope-radio", "value")
+)
+def update_studio_product_perspective(product_code, flow, year, scope):
+    product_code = str(product_code or "87")
+    partners_df = load_product_partners()
+    year = int(year or 2024)
+
+    valid_years = sorted(partners_df["year"].unique())
+    target_year = year if year in valid_years else max(valid_years)
+
+    sub = partners_df[(partners_df["hs2_code"] == product_code) &
+                      (partners_df["flow"] == flow) &
+                      (partners_df["year"] == target_year)].copy()
 
     if sub.empty:
-        return go.Figure()
+        sub = partners_df[(partners_df["hs2_code"] == product_code) & (partners_df["flow"] == flow)].copy()
+        if not sub.empty:
+            target_year = sub["year"].max()
+            sub = sub[sub["year"] == target_year]
 
-    fig = go.Figure(go.Bar(
-        x=sub["value_eur"] / 1e6,
-        y=sub[y_col],
-        orientation="h",
-        marker_color=PRIMARY if flow == "EXPORT" else SECONDARY,
-        text=sub["value_eur"].apply(lambda v: fmt_eur(v)),
-        textposition="outside",
-        hovertemplate="%{y}<br>Value: €%{x:.2f}M<extra></extra>"
+    prod_name = sub["hs2_name"].iloc[0] if not sub.empty else f"Produit {product_code}"
+    hhi_val = sub["hhi"].iloc[0] if not sub.empty and "hhi" in sub.columns else 1200.0
+    tot_eur = sub["total_eur"].iloc[0] if not sub.empty and "total_eur" in sub.columns else sub["value_eur"].sum()
+
+    # 1. Product Map
+    sub_map = add_iso3_column(sub)
+    sub_valid = sub_map.dropna(subset=["iso3"]).copy()
+
+    fig_map = go.Figure()
+    if not sub_valid.empty:
+        sub_valid["color_val"] = np.log10(np.maximum(1000.0, sub_valid["value_eur"]))
+        cmin = 4.0
+        cmax = max(5.0, sub_valid["color_val"].max())
+
+        fig_map.add_trace(go.Choropleth(
+            locations=sub_valid["iso3"],
+            z=sub_valid["color_val"],
+            text=sub_valid["partner_name"],
+            customdata=np.stack([sub_valid["partner_code"], sub_valid["value_eur"], sub_valid["partner_share_pct"]], axis=-1),
+            hovertemplate="<b>%{text} (%{customdata[0]})</b><br>Fourniture : €%{customdata[1]:,.0f}<br>Part : %{customdata[2]:.1f}%<extra></extra>",
+            colorscale=[[0.0, "#ECFDF5"], [0.3, "#A7F3D0"], [0.6, "#10B981"], [0.85, "#047857"], [1.0, "#064E3B"]],
+            zmin=cmin, zmax=cmax,
+            colorbar=dict(title="Volume", len=0.7, thickness=12, x=0.98, y=0.5)
+        ))
+
+    # Luxembourg Hub
+    fig_map.add_trace(go.Scattergeo(
+        lon=[6.13], lat=[49.61],
+        mode="markers+text",
+        marker=dict(size=13, color=STATEC_YELLOW, symbol="star", line=dict(color=STATEC_NAVY, width=2)),
+        text=["★ Luxembourg"],
+        textposition="top center",
+        name="Luxembourg (Hub)"
     ))
-    apply_plot_theme(fig, title=f"Top Significant Flows for {partner} ({level}-digit level)", x_title="Million Euros (€M)")
-    fig.update_layout(margin=dict(l=10, r=50, t=35, b=30), yaxis=dict(autorange="reversed"))
-    return fig
+
+    apply_map_theme(fig_map, scope="world" if scope != "EU27" else "europe")
+    fig_map.update_layout(
+        title=dict(text=f"Fournisseurs / Clients — Ch. {product_code} ({target_year})", font=dict(family="Montserrat", size=13, color=STATEC_NAVY)),
+        height=410,
+        margin=dict(l=10, r=10, t=35, b=10)
+    )
+
+    # 2. Top Suppliers Bar Chart
+    top10_supp = sub.sort_values("value_eur", ascending=True).tail(10).copy()
+    fig_supp = go.Figure(go.Bar(
+        x=top10_supp["value_eur"] / 1e6,
+        y=[f"{r['partner_name']} ({r['partner_code']})" for _, r in top10_supp.iterrows()],
+        orientation="h",
+        marker_color="#059669" if flow == "IMPORT" else PRIMARY,
+        text=[f"€{v/1e6:.1f}M ({s:.1f}%)" for v, s in zip(top10_supp["value_eur"], top10_supp["partner_share_pct"])],
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Valeur : €%{x:.2f}M<extra></extra>"
+    ))
+    apply_plot_theme(fig_supp, title=f"Origine des Flux pour Ch. {product_code} en {target_year}", x_title="Millions d'Euros (€M)")
+    fig_supp.update_layout(height=320, margin=dict(l=10, r=60, t=35, b=25), yaxis=dict(autorange="reversed"))
+
+    # 3. Product KPI & Vulnerability Card
+    hhi_badge = get_concentration_badge(hhi_val)
+    top3_share = top10_supp.tail(3)["partner_share_pct"].sum() if not top10_supp.empty else 0.0
+
+    kpi_card = html.Div([
+        html.Div([
+            html.Div([
+                create_icon_badge("bi bi-shield-check" if hhi_val < 1500 else ("bi bi-shield-exclamation" if hhi_val < 2500 else "bi bi-exclamation-triangle-fill"),
+                                  color=SUCCESS if hhi_val < 1500 else (WARNING if hhi_val < 2500 else DANGER),
+                                  bg="#DCFCE7" if hhi_val < 1500 else ("#FEF3C7" if hhi_val < 2500 else "#FEE2E2"),
+                                  size=18, box_size=38),
+                html.Div([
+                    html.H6(f"CH. {product_code} — {prod_name[:40]}", style={"fontWeight": "800", "fontFamily": "'Montserrat', sans-serif", "color": STATEC_NAVY, "marginBottom": "0", "fontSize": "13.5px"}),
+                    html.Span(f"Total annuel : {fmt_eur(tot_eur)} • Top-3 pays concentrent {top3_share:.1f}% des flux", style={"fontSize": "11.5px", "color": TEXT_MUTED})
+                ], className="ms-2")
+            ], className="d-flex align-items-center"),
+            html.Div(hhi_badge)
+        ], className="d-flex align-items-center justify-content-between mb-2"),
+
+        html.Div([
+            html.Small([
+                html.Strong("Diagnostic de Résilience : "),
+                f"Ce produit présente un niveau de concentration {'faible et bien diversifié' if hhi_val < 1500 else ('modéré nécessitant une veille' if hhi_val < 2500 else 'critique avec dépendance aiguë à un oligopole de fournisseurs')}."
+            ], style={"fontSize": "11px", "color": TEXT_MUTED})
+        ], className="p-2 rounded", style={"backgroundColor": "#F8FAFC", "border": f"1px solid {BORDER}"})
+    ], style={**CARD_STYLE, "marginBottom": "16px"})
+
+    # 4. Long-Term Historical Trajectory (2000-2024)
+    all_rankings = load_product_rankings()
+    prod_hist = all_rankings[(all_rankings["hs2_code"] == product_code) & (all_rankings["flow"] == flow)].sort_values("year")
+    fig_hist = go.Figure()
+    if not prod_hist.empty:
+        fig_hist.add_trace(go.Scatter(
+            x=prod_hist["year"],
+            y=prod_hist["value_eur"] / 1e6,
+            mode="lines+markers",
+            line=dict(color="#059669" if flow == "IMPORT" else PRIMARY, width=3),
+            marker=dict(size=5, color=STATEC_YELLOW),
+            fill="tozeroy",
+            fillcolor="rgba(5, 150, 105, 0.08)" if flow == "IMPORT" else "rgba(0, 102, 178, 0.08)",
+            hovertemplate="Année %{x}<br>Volume : €%{y:,.1f}M<extra></extra>"
+        ))
+    apply_plot_theme(fig_hist, title=f"Évolution 2000–2024 de Ch. {product_code} (€M)", x_title="Année", y_title="M€")
+    fig_hist.update_layout(height=280, margin=dict(l=10, r=20, t=35, b=30))
+
+    return fig_map, fig_supp, kpi_card, fig_hist
 
 
 # ───────────────────────────────────────────────────────────────────────────
