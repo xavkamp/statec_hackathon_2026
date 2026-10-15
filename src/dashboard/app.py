@@ -53,6 +53,64 @@ def get_country_name(code: str) -> str:
     c = str(code).upper().strip()
     return ISO2_NAMES_EN.get(c, c)
 
+
+# ── Canonical Resilience Radar Baskets ─────────────────────────────────────
+RESILIENCE_BASKETS = {
+    "ALL": {
+        "name": "All Product Categories",
+        "short_name": "All Products",
+        "chapters": [],
+        "desc": "Complete merchandise trade scope across all tariff lines"
+    },
+    "ENERGY": {
+        "name": "Energy & Fuels",
+        "short_name": "Energy & Fuels",
+        "chapters": ["27"],
+        "desc": "Refined petroleum, natural gas, electrical energy"
+    },
+    "FOOD": {
+        "name": "Food & Nutrition",
+        "short_name": "Food & Nutrition",
+        "chapters": ["01", "02", "03", "04", "10", "16", "19", "22"],
+        "desc": "Dairy, meat, cereals, beverages, essential nutrition"
+    },
+    "HEALTH": {
+        "name": "Health & Medicines",
+        "short_name": "Health & Medicines",
+        "chapters": ["30", "90"],
+        "desc": "Pharmaceutical products, surgical & medical instruments"
+    },
+    "METALS": {
+        "name": "Raw Materials & Metals",
+        "short_name": "Raw Materials & Metals",
+        "chapters": ["72", "73", "25", "26", "76"],
+        "desc": "Iron, steel, aluminium, construction minerals"
+    },
+    "TECH": {
+        "name": "Tech & Machinery",
+        "short_name": "Tech & Machinery",
+        "chapters": ["84", "85"],
+        "desc": "Computers, electrical generators, telecom apparatus"
+    },
+    "VEHICLES": {
+        "name": "Vehicles & Transport",
+        "short_name": "Vehicles & Transport",
+        "chapters": ["87", "88"],
+        "desc": "Passenger cars, commercial transport equipment, aerospace"
+    },
+}
+
+BASKET_FILTER_OPTIONS = [
+    {"label": "All Product Categories", "value": "ALL"},
+    {"label": "Energy & Fuels (Ch. 27)", "value": "ENERGY"},
+    {"label": "Food & Nutrition (Ch. 01–04, 10, 16, 19, 22)", "value": "FOOD"},
+    {"label": "Health & Medicines (Ch. 30, 90)", "value": "HEALTH"},
+    {"label": "Raw Materials & Metals (Ch. 25–26, 72–73, 76)", "value": "METALS"},
+    {"label": "Tech & Machinery (Ch. 84, 85)", "value": "TECH"},
+    {"label": "Vehicles & Transport (Ch. 87, 88)", "value": "VEHICLES"},
+]
+
+
 app = dash.Dash(
     __name__,
     assets_folder=str(BASE_DIR / "assets"),
@@ -763,7 +821,18 @@ def render_tab_partners(selected_year):
                         clearable=False,
                         className="fw-semibold small"
                     )
-                ], md=3),
+                ], md=3, sm=6),
+
+                dbc.Col([
+                    html.Label("CRITICAL BASKET FILTER:", className="control-label"),
+                    dcc.Dropdown(
+                        id="q4-basket-dropdown",
+                        options=BASKET_FILTER_OPTIONS,
+                        value="ALL",
+                        clearable=False,
+                        className="fw-semibold small"
+                    )
+                ], md=3, sm=6),
 
                 dbc.Col([
                     html.Label("TRADE FLOW:", className="control-label"),
@@ -777,19 +846,19 @@ def render_tab_partners(selected_year):
                         inline=True,
                         className="btn-group",
                         input_class_name="btn-check",
-                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
-                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
                     )
-                ], md=2),
+                ], md=2, sm=6),
 
                 dbc.Col([
-                    html.Label("TARIFF GRANULARITY LEVEL:", className="control-label"),
+                    html.Label("TARIFF LEVEL:", className="control-label"),
                     dbc.RadioItems(
                         id="q4-level-radio",
                         options=[
-                            {"label": "HS2 (Chapters)", "value": 2},
-                            {"label": "HS4 (Subheadings)", "value": 4},
-                            {"label": "CN8 (Detailed)", "value": 8},
+                            {"label": "HS2", "value": 2},
+                            {"label": "HS4", "value": 4},
+                            {"label": "CN8", "value": 8},
                         ],
                         value=4,
                         inline=True,
@@ -798,10 +867,10 @@ def render_tab_partners(selected_year):
                         label_class_name="btn btn-outline-dark btn-sm px-2 py-1 flex-fill",
                         label_checked_class_name="btn btn-dark btn-sm px-2 py-1 text-white fw-bold flex-fill",
                     )
-                ], md=4),
+                ], md=2, sm=6),
 
                 dbc.Col([
-                    html.Label("SIGNIFICANCE FILTER:", className="control-label"),
+                    html.Label("FILTER:", className="control-label"),
                     dcc.Dropdown(
                         id="q4-threshold-dropdown",
                         options=[
@@ -814,7 +883,7 @@ def render_tab_partners(selected_year):
                         clearable=False,
                         className="fw-semibold small"
                     )
-                ], md=3)
+                ], md=2, sm=12)
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1044,6 +1113,17 @@ def render_tab_products(selected_year):
         html.Div([
             dbc.Row([
                 dbc.Col([
+                    html.Label("CRITICAL BASKET FILTER:", className="control-label"),
+                    dcc.Dropdown(
+                        id="q2-basket-dropdown",
+                        options=BASKET_FILTER_OPTIONS,
+                        value="ALL",
+                        clearable=False,
+                        className="fw-semibold small"
+                    )
+                ], md=4, sm=12),
+
+                dbc.Col([
                     html.Label("TRADE FLOW:", className="control-label"),
                     dbc.RadioItems(
                         id="q2-flow-radio",
@@ -1058,7 +1138,7 @@ def render_tab_products(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
                     )
-                ], md=5),
+                ], md=4, sm=6),
 
                 dbc.Col([
                     html.Label("GRANULARITY:", className="control-label"),
@@ -1075,7 +1155,7 @@ def render_tab_products(selected_year):
                         label_class_name="btn btn-outline-dark btn-sm px-3 py-1",
                         label_checked_class_name="btn btn-dark btn-sm px-3 py-1 text-white fw-bold",
                     )
-                ], md=7)
+                ], md=4, sm=6)
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1115,6 +1195,17 @@ def render_tab_products(selected_year):
         html.Div([
             dbc.Row([
                 dbc.Col([
+                    html.Label("CRITICAL BASKET FILTER:", className="control-label"),
+                    dcc.Dropdown(
+                        id="q3-basket-dropdown",
+                        options=BASKET_FILTER_OPTIONS,
+                        value="ALL",
+                        clearable=False,
+                        className="fw-semibold small"
+                    )
+                ], md=4, sm=12),
+
+                dbc.Col([
                     html.Label("SELECT PRODUCT CATEGORY:", className="control-label"),
                     dcc.Dropdown(
                         id="q3-product-dropdown",
@@ -1123,7 +1214,7 @@ def render_tab_products(selected_year):
                         clearable=False,
                         className="fw-semibold small"
                     )
-                ], md=6),
+                ], md=4, sm=12),
 
                 dbc.Col([
                     html.Label("TRADE FLOW:", className="control-label"),
@@ -1140,7 +1231,7 @@ def render_tab_products(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
                     )
-                ], md=6)
+                ], md=4, sm=12)
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1167,17 +1258,26 @@ def render_tab_products(selected_year):
     Input("q2-top-products-bar", "clickData"),
     Input("q2-flow-radio", "value"),
     Input("q2-granularity-radio", "value"),
+    Input("q2-basket-dropdown", "value"),
     Input("global-year-dropdown", "value"),
     State("q2-selected-product", "data")
 )
-def update_q2_selected_product(bar_click, flow, granularity, year, current_prod):
+def update_q2_selected_product(bar_click, flow, granularity, basket, year, current_prod):
+    chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
+
     if granularity == 4:
         hs4_df = load_hs4_product_rankings()
-        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].sort_values("value_eur", ascending=False)
+        sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)]
+        if chapters:
+            sub = sub[sub["hs4_code"].astype(str).str[:2].isin(chapters)]
+        sub = sub.sort_values("value_eur", ascending=False)
         default_prod = str(sub.iloc[0]["hs4_code"]) if not sub.empty else "8703"
     else:
         prod_df = load_product_rankings()
-        sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == flow)].sort_values("value_eur", ascending=False)
+        sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == flow)]
+        if chapters:
+            sub = sub[sub["hs2_code"].astype(str).str[:2].isin(chapters)]
+        sub = sub.sort_values("value_eur", ascending=False)
         default_prod = str(sub.iloc[0]["hs2_code"]) if not sub.empty else "87"
 
     try:
@@ -1186,7 +1286,7 @@ def update_q2_selected_product(bar_click, flow, granularity, year, current_prod)
             return default_prod
         trig_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        if trig_id in ["q2-flow-radio", "q2-granularity-radio", "global-year-dropdown"]:
+        if trig_id in ["q2-flow-radio", "q2-granularity-radio", "q2-basket-dropdown", "global-year-dropdown"]:
             return default_prod
 
         if trig_id == "q2-top-products-bar" and bar_click:
@@ -1205,15 +1305,20 @@ def update_q2_selected_product(bar_click, flow, granularity, year, current_prod)
     Output("q2-shift-chart-title", "children"),
     Input("q2-flow-radio", "value"),
     Input("q2-granularity-radio", "value"),
+    Input("q2-basket-dropdown", "value"),
     Input("q2-selected-product", "data"),
     Input("global-year-dropdown", "value")
 )
-def update_q2_charts(flow, granularity, selected_prod, year):
+def update_q2_charts(flow, granularity, basket, selected_prod, year):
+    chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
+
     if granularity == 4:
         hs4_df = load_hs4_product_rankings()
         sub = hs4_df[(hs4_df["year"] == year) & (hs4_df["flow"] == flow)].copy()
         if sub.empty:
             sub = hs4_df[(hs4_df["year"] == hs4_df["year"].max()) & (hs4_df["flow"] == flow)].copy()
+        if chapters:
+            sub = sub[sub["hs4_code"].astype(str).str[:2].isin(chapters)]
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
         top["label"] = "HS " + top["hs4_code"] + ": " + top["hs4_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
         code_col = top["hs4_code"]
@@ -1222,6 +1327,8 @@ def update_q2_charts(flow, granularity, selected_prod, year):
         sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == flow)].copy()
         if sub.empty:
             sub = prod_df[(prod_df["year"] == prod_df["year"].max()) & (prod_df["flow"] == flow)].copy()
+        if chapters:
+            sub = sub[sub["hs2_code"].astype(str).str[:2].isin(chapters)]
         top = sub.sort_values("value_eur", ascending=False).head(10).copy()
         top["label"] = "Ch. " + top["hs2_code"] + ": " + top["hs2_name"].apply(lambda s: str(s)[:34] + ".." if len(str(s)) > 34 else str(s))
         code_col = top["hs2_code"]
@@ -1229,12 +1336,12 @@ def update_q2_charts(flow, granularity, selected_prod, year):
     bar_colors = [STATEC_YELLOW if str(c) == str(selected_prod) else (SECONDARY if flow == "IMPORT" else PRIMARY) for c in code_col]
 
     fig_bar = go.Figure(go.Bar(
-        x=top["value_eur"] / 1e6,
-        y=top["label"],
+        x=top["value_eur"] / 1e6 if not top.empty else [],
+        y=top["label"] if not top.empty else [],
         orientation="h",
         marker_color=bar_colors,
         customdata=code_col,
-        text=[fmt_eur(v) for v in top["value_eur"]],
+        text=[fmt_eur(v) for v in top["value_eur"]] if not top.empty else [],
         textposition="outside",
         hovertemplate="<b>%{y}</b><br>Trade Value: €%{x:,.1f}M<extra></extra>"
     ))
@@ -1243,16 +1350,20 @@ def update_q2_charts(flow, granularity, selected_prod, year):
     fig_bar.update_xaxes(range=[0, max_val_m * 1.25])
     fig_bar.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    # Structural shift chart: dynamically track top 5 product categories for this flow in the selected year
+    # Structural shift chart: dynamically track top product categories for this flow and basket
     all_prod = load_product_rankings()
-    sub_yr = all_prod[(all_prod["year"] == year) & (all_prod["flow"] == flow)].sort_values("value_eur", ascending=False)
+    sub_yr = all_prod[(all_prod["year"] == year) & (all_prod["flow"] == flow)]
+    if chapters:
+        sub_yr = sub_yr[sub_yr["hs2_code"].astype(str).str[:2].isin(chapters)]
+    sub_yr = sub_yr.sort_values("value_eur", ascending=False)
+
     if not sub_yr.empty:
         top5_chs = sub_yr.head(5)
         key_chs = top5_chs["hs2_code"].tolist()
         ch_names = {r["hs2_code"]: f"{r['hs2_name'][:20]} ({r['hs2_code']})" for _, r in top5_chs.iterrows()}
     else:
-        key_chs = ["72", "84", "87", "39", "30"]
-        ch_names = {"72": "Iron & Steel (72)", "84": "Machinery (84)", "87": "Vehicles (87)", "39": "Plastics (39)", "30": "Pharma (30)"}
+        key_chs = chapters[:5] if chapters else ["72", "84", "87", "39", "30"]
+        ch_names = {ch: f"Ch. {ch}" for ch in key_chs}
 
     fig_shift = go.Figure()
     for ch in key_chs:
@@ -1272,8 +1383,9 @@ def update_q2_charts(flow, granularity, selected_prod, year):
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
     )
 
-    barchart_title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}"
-    shift_title = f"25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT {flow.upper()}S (2000–2025)"
+    basket_suffix = f" [{RESILIENCE_BASKETS.get(basket, {}).get('short_name', basket)}]" if (basket and basket != "ALL") else ""
+    barchart_title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}{basket_suffix}"
+    shift_title = f"25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT {flow.upper()}S (2000–2025){basket_suffix}"
     return barchart_title, fig_bar, fig_shift, shift_title
 
 
@@ -1350,13 +1462,60 @@ def render_tab_q3_product_partners(selected_year):
 
 
 @callback(
-    Output("q3-product-dropdown", "value"),
-    Input("q2-selected-product", "data"),
+    Output("q3-basket-dropdown", "value"),
+    Input("q2-basket-dropdown", "value"),
     prevent_initial_call=True
 )
-def sync_q3_product_from_q2(selected_prod):
+def sync_q3_basket_from_q2(basket):
+    if basket:
+        return basket
+    return dash.no_update
+
+
+@callback(
+    Output("q3-product-dropdown", "options"),
+    Input("q3-basket-dropdown", "value")
+)
+def update_q3_product_options(basket):
+    prod_df = load_product_rankings()
+    if prod_df.empty:
+        return []
+    u = prod_df[["hs2_code", "hs2_name"]].drop_duplicates().sort_values("hs2_code")
+    chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
+    if chapters:
+        u = u[u["hs2_code"].astype(str).str[:2].isin(chapters)]
+    return [{"label": f"Ch. {r['hs2_code']} — {r['hs2_name'][:35]}", "value": str(r["hs2_code"])} for _, r in u.iterrows()]
+
+
+@callback(
+    Output("q3-product-dropdown", "value"),
+    Input("q2-selected-product", "data"),
+    Input("q3-basket-dropdown", "value"),
+    State("q3-product-dropdown", "value"),
+    State("global-year-dropdown", "value"),
+    State("q3-flow-radio", "value"),
+    prevent_initial_call=True
+)
+def sync_q3_product_from_q2(selected_prod, basket, current_q3_val, year, flow):
+    ctx = dash.callback_context
+    trig_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx and ctx.triggered else ""
+
+    chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", []) if (basket and basket != "ALL") else []
+
+    if trig_id == "q3-basket-dropdown":
+        if chapters:
+            prod_df = load_product_rankings()
+            sub = prod_df[(prod_df["year"] == year) & (prod_df["flow"] == (flow or "IMPORT")) & (prod_df["hs2_code"].isin(chapters))].sort_values("value_eur", ascending=False)
+            if not sub.empty:
+                return str(sub.iloc[0]["hs2_code"])
+            return chapters[0]
+        else:
+            return current_q3_val or "87"
+
     if selected_prod:
-        return str(selected_prod)[:2].zfill(2)
+        ch = str(selected_prod)[:2].zfill(2)
+        if not chapters or ch in chapters:
+            return ch
     return dash.no_update
 
 
@@ -1458,9 +1617,10 @@ def sync_q4_flow_from_q1(flow):
     Input("q4-flow-radio", "value"),
     Input("q4-level-radio", "value"),
     Input("q4-threshold-dropdown", "value"),
+    Input("q4-basket-dropdown", "value"),
     Input("global-year-dropdown", "value")
 )
-def update_q4_chart(partner_code, flow, level, threshold, year):
+def update_q4_chart(partner_code, flow, level, threshold, basket, year):
     partner_code = str(partner_code or "DE").upper()
     level = int(level or 4)
 
@@ -1497,6 +1657,25 @@ def update_q4_chart(partner_code, flow, level, threshold, year):
             })
             level = 2
 
+    # Resilience basket filtering
+    basket_name = RESILIENCE_BASKETS.get(basket, {}).get("short_name", "")
+    basket_suffix = f" [{basket_name}]" if (basket and basket != "ALL") else ""
+
+    if basket and basket != "ALL":
+        chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", [])
+        if chapters and not sub.empty:
+            sub = sub[sub["product_code"].astype(str).str[:2].isin(chapters)]
+
+    if sub.empty:
+        fig = go.Figure()
+        apply_plot_theme(fig, x_title="Million Euros (€M)")
+        fig.add_annotation(
+            text=f"No traded lines recorded for basket '{basket_name or basket}'",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=13, color=TEXT_MUTED, family="Inter, sans-serif")
+        )
+        return f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()}){basket_suffix}", fig
+
     if threshold in [15, 25]:
         sub = sub.sort_values("value_eur", ascending=False).head(int(threshold)).copy()
     else:
@@ -1518,7 +1697,7 @@ def update_q4_chart(partner_code, flow, level, threshold, year):
     fig.update_xaxes(range=[0, max_val_m * 1.25])
     fig.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    title = f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()})"
+    title = f"{get_country_name(partner_code)} ({partner_code}) — Level {level} Tariff Breakdown ({flow.capitalize()}){basket_suffix}"
     return title, fig
 
 
@@ -1690,6 +1869,16 @@ def render_tab_benchmarks(selected_year):
         html.Div([
             dbc.Row([
                 dbc.Col([
+                    html.Label("CRITICAL BASKET FILTER:", className="control-label"),
+                    dcc.Dropdown(
+                        id="q5-basket-dropdown",
+                        options=BASKET_FILTER_OPTIONS,
+                        value="ALL",
+                        clearable=False,
+                        className="fw-semibold small"
+                    )
+                ], md=4, sm=12),
+                dbc.Col([
                     html.Label("PRODUCT CATEGORY:", className="control-label"),
                     dcc.Dropdown(
                         id="q5-product-dropdown",
@@ -1699,7 +1888,7 @@ def render_tab_benchmarks(selected_year):
                         searchable=True,
                         className="fw-semibold small"
                     )
-                ], md=7, sm=12),
+                ], md=4, sm=12),
                 dbc.Col([
                     html.Label("GROWTH FLOW:", className="control-label"),
                     dbc.RadioItems(
@@ -1716,7 +1905,7 @@ def render_tab_benchmarks(selected_year):
                         label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
                         label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
                     )
-                ], md=5, sm=12),
+                ], md=4, sm=12),
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1735,6 +1924,26 @@ def render_tab_benchmarks(selected_year):
             ], md=5)
         ])
     ])
+
+
+@callback(
+    Output("q5-product-dropdown", "options"),
+    Output("q5-product-dropdown", "value"),
+    Input("q5-basket-dropdown", "value"),
+    State("q5-product-dropdown", "value")
+)
+def update_q5_product_options(basket, current_val):
+    if not basket or basket == "ALL":
+        opts = BENCHMARK_PRODUCT_OPTIONS
+    else:
+        chapters = set(RESILIENCE_BASKETS.get(basket, {}).get("chapters", []))
+        opts = [opt for opt in BENCHMARK_PRODUCT_OPTIONS if opt["value"] in chapters]
+        if not opts:
+            opts = BENCHMARK_PRODUCT_OPTIONS
+
+    val_opts = [o["value"] for o in opts]
+    new_val = current_val if current_val in val_opts else val_opts[0]
+    return opts, new_val
 
 
 @callback(
@@ -1771,6 +1980,17 @@ def render_tab_seasonality():
         html.Div([
             dbc.Row([
                 dbc.Col([
+                    html.Label("CRITICAL BASKET FILTER:", className="control-label"),
+                    dcc.Dropdown(
+                        id="sea-basket-dropdown",
+                        options=BASKET_FILTER_OPTIONS,
+                        value="ALL",
+                        clearable=False,
+                        className="fw-semibold small"
+                    )
+                ], md=3, sm=6),
+
+                dbc.Col([
                     html.Label("PRODUCT SECTOR:", className="control-label"),
                     dcc.Dropdown(
                         id="sea-product-dropdown",
@@ -1779,7 +1999,7 @@ def render_tab_seasonality():
                         clearable=False,
                         className="fw-semibold small"
                     )
-                ], md=4),
+                ], md=3, sm=6),
 
                 dbc.Col([
                     html.Label("TRADE FLOW:", className="control-label"),
@@ -1794,10 +2014,10 @@ def render_tab_seasonality():
                         inline=True,
                         className="btn-group",
                         input_class_name="btn-check",
-                        label_class_name="btn btn-outline-secondary btn-sm px-3 py-1",
-                        label_checked_class_name="btn btn-secondary btn-sm px-3 py-1 text-white fw-bold",
+                        label_class_name="btn btn-outline-secondary btn-sm px-2 py-1",
+                        label_checked_class_name="btn btn-secondary btn-sm px-2 py-1 text-white fw-bold",
                     )
-                ], md=4),
+                ], md=3, sm=6),
 
                 dbc.Col([
                     html.Label("SERIES DISPLAY:", className="control-label"),
@@ -1812,7 +2032,7 @@ def render_tab_seasonality():
                         inline=True,
                         className="fw-semibold small"
                     )
-                ], md=4)
+                ], md=3, sm=6)
             ], align="center")
         ], className="control-ribbon"),
 
@@ -1832,6 +2052,34 @@ def render_tab_seasonality():
             ], md=4)
         ])
     ])
+
+
+@callback(
+    Output("sea-product-dropdown", "options"),
+    Output("sea-product-dropdown", "value"),
+    Input("sea-basket-dropdown", "value"),
+    State("sea-product-dropdown", "value")
+)
+def update_sea_product_options(basket, current_val):
+    sea_df = load_seasonal_decomposition()
+    if sea_df.empty:
+        return [], "TOTAL"
+
+    u = sea_df[["product_code", "product_name"]].drop_duplicates().sort_values("product_code")
+    all_opts = [{"label": f"{r['product_code']} — {r['product_name'][:35]}", "value": str(r["product_code"])} for _, r in u.iterrows()]
+
+    if not basket or basket == "ALL":
+        opts = all_opts
+    else:
+        chapters = set(RESILIENCE_BASKETS.get(basket, {}).get("chapters", []))
+        opts = [opt for opt in all_opts if opt["value"] in chapters]
+        if not opts:
+            # If no sub-sectors are present for this basket in the seasonal dataset, provide TOTAL with informative label
+            opts = [opt for opt in all_opts if opt["value"] == "TOTAL"] or all_opts
+
+    val_opts = [o["value"] for o in opts]
+    new_val = current_val if current_val in val_opts else val_opts[0]
+    return opts, new_val
 
 
 @callback(
