@@ -190,70 +190,50 @@ def create_compact_kpi_ribbon(year: int):
     ], className="mb-3")
 
 
-# ── Navigation: 2 Major Modes (Resilience Radar vs Deep-Dive) ─────────────
+# ── Navigation Tabs ────────────────────────────────────────────────────────
 def create_navigation_boxes():
     return html.Div([
         html.Div([
-            # Two Major Mode Buttons
-            html.Div([
-                html.Button([
-                    html.I(className="bi bi-shield-check me-2"),
-                    "Resilience Radar"
-                ], id="btn-mode-resilience", className="nav-mode-btn active", n_clicks=0),
+            html.Button([
+                html.I(className="bi bi-shield-check me-1 text-warning"),
+                "Resilience Radar"
+            ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
 
-                html.Button([
-                    html.I(className="bi bi-diagram-3 me-2"),
-                    "Deep-Dive"
-                ], id="btn-mode-deepdive", className="nav-mode-btn", n_clicks=0),
-            ], className="nav-mode-bar"),
+            html.Button([
+                html.I(className="bi bi-geo-alt me-1"),
+                "Q1: Trading Partners"
+            ], id="btn-tab-partners", className="nav-tab-btn", n_clicks=0),
 
-            # Sub-row: Resilience Radar button (shown when Resilience Radar is active)
-            html.Div([
-                html.Button([
-                    html.I(className="bi bi-shield-check me-1 text-warning"),
-                    "Sovereign Supply & Geopolitical Resilience"
-                ], id="btn-tab-resilience", className="nav-tab-btn active", n_clicks=0),
-            ], id="nav-group-resilience", className="d-flex flex-wrap nav-subtabs-container"),
+            html.Button([
+                html.I(className="bi bi-boxes me-1"),
+                "Q2: Product Categories"
+            ], id="btn-tab-products", className="nav-tab-btn", n_clicks=0),
 
-            # Sub-row: 6 Deep-Dive buttons (shown when Deep-Dive is active)
-            html.Div([
-                html.Button([
-                    html.I(className="bi bi-geo-alt me-1"),
-                    "Q1: Trading Partners"
-                ], id="btn-tab-partners", className="nav-tab-btn", n_clicks=0),
+            html.Button([
+                html.I(className="bi bi-funnel me-1"),
+                "Q3: Product Principal Partners"
+            ], id="btn-tab-q3-partners", className="nav-tab-btn", n_clicks=0),
 
-                html.Button([
-                    html.I(className="bi bi-boxes me-1"),
-                    "Q2: Product Categories"
-                ], id="btn-tab-products", className="nav-tab-btn", n_clicks=0),
+            html.Button([
+                html.I(className="bi bi-list-nested me-1"),
+                "Q4: Product Breakdown per Country"
+            ], id="btn-tab-q4-drilldown", className="nav-tab-btn", n_clicks=0),
 
-                html.Button([
-                    html.I(className="bi bi-funnel me-1"),
-                    "Q3: Product Principal Partners"
-                ], id="btn-tab-q3-partners", className="nav-tab-btn", n_clicks=0),
+            html.Button([
+                html.I(className="bi bi-bar-chart-steps me-1"),
+                "Q5: Peer Benchmarking"
+            ], id="btn-tab-benchmarks", className="nav-tab-btn", n_clicks=0),
 
-                html.Button([
-                    html.I(className="bi bi-list-nested me-1"),
-                    "Q4: Product Breakdown per Country"
-                ], id="btn-tab-q4-drilldown", className="nav-tab-btn", n_clicks=0),
-
-                html.Button([
-                    html.I(className="bi bi-bar-chart-steps me-1"),
-                    "Q5: Peer Benchmarking"
-                ], id="btn-tab-benchmarks", className="nav-tab-btn", n_clicks=0),
-
-                html.Button([
-                    html.I(className="bi bi-calendar-range me-1"),
-                    "Q6: Seasonality Lab"
-                ], id="btn-tab-seasonality", className="nav-tab-btn", n_clicks=0),
-            ], id="nav-group-deepdive", className="d-none nav-subtabs-container"),
-        ], className="nav-mode-container")
-    ])
+            html.Button([
+                html.I(className="bi bi-calendar-range me-1"),
+                "Q6: Seasonality Lab"
+            ], id="btn-tab-seasonality", className="nav-tab-btn", n_clicks=0),
+        ], className="d-flex flex-wrap align-items-center nav-mode-container")
+    ], className="mb-3")
 
 
 # ── App Main Layout ─────────────────────────────────────────────────────────
 app.layout = html.Div([
-    dcc.Store(id="nav-mode-store", data="resilience"),
     dcc.Store(id="active-tab-store", data="tab-resilience"),
     create_header(),
     dbc.Container([
@@ -280,63 +260,33 @@ TAB_ID_MAP = {
     "btn-tab-benchmarks": "tab-benchmarks",
     "btn-tab-seasonality": "tab-seasonality"
 }
-RESILIENCE_TABS = ["tab-resilience"]
-DEEPDIVE_TABS = ["tab-partners", "tab-products", "tab-q3-partners", "tab-q4-drilldown", "tab-benchmarks", "tab-seasonality"]
 
 
 @callback(
-    Output("nav-mode-store", "data"),
     Output("active-tab-store", "data"),
-    Output("btn-mode-resilience", "className"),
-    Output("btn-mode-deepdive", "className"),
-    Output("nav-group-resilience", "className"),
-    Output("nav-group-deepdive", "className"),
     [Output(b_id, "className") for b_id in ALL_TAB_BTNS],
-    Input("btn-mode-resilience", "n_clicks"),
-    Input("btn-mode-deepdive", "n_clicks"),
     [Input(b_id, "n_clicks") for b_id in ALL_TAB_BTNS],
-    State("nav-mode-store", "data"),
     State("active-tab-store", "data"),
     prevent_initial_call=False
 )
-def switch_active_nav_tab(mode_res_clk, mode_dd_clk, *args):
-    current_mode = args[-2] or "resilience"
+def switch_active_nav_tab(*args):
     current_tab = args[-1] or "tab-resilience"
 
     try:
         ctx = dash.callback_context
         if ctx and ctx.triggered:
             trig_id = ctx.triggered[0]["prop_id"].split(".")[0]
-            if trig_id == "btn-mode-resilience":
-                current_mode = "resilience"
-                if current_tab not in RESILIENCE_TABS:
-                    current_tab = "tab-resilience"
-            elif trig_id == "btn-mode-deepdive":
-                current_mode = "deepdive"
-                if current_tab not in DEEPDIVE_TABS:
-                    current_tab = "tab-partners"
-            elif trig_id in TAB_ID_MAP:
-                clicked_tab = TAB_ID_MAP[trig_id]
-                current_tab = clicked_tab
-                if clicked_tab in RESILIENCE_TABS:
-                    current_mode = "resilience"
-                else:
-                    current_mode = "deepdive"
+            if trig_id in TAB_ID_MAP:
+                current_tab = TAB_ID_MAP[trig_id]
     except Exception:
         pass
-
-    mode_res_class = "nav-mode-btn active" if current_mode == "resilience" else "nav-mode-btn"
-    mode_dd_class = "nav-mode-btn active" if current_mode == "deepdive" else "nav-mode-btn"
-
-    group_res_class = "d-flex flex-wrap nav-subtabs-container" if current_mode == "resilience" else "d-none"
-    group_dd_class = "d-flex flex-wrap nav-subtabs-container" if current_mode == "deepdive" else "d-none"
 
     tab_classes = [
         "nav-tab-btn active" if TAB_ID_MAP[b_id] == current_tab else "nav-tab-btn"
         for b_id in ALL_TAB_BTNS
     ]
 
-    return tuple([current_mode, current_tab, mode_res_class, mode_dd_class, group_res_class, group_dd_class] + tab_classes)
+    return tuple([current_tab] + tab_classes)
 
 
 @callback(
@@ -457,14 +407,14 @@ def render_tab_resilience(selected_year):
         fig_comp.add_trace(go.Bar(
             y=comp_df["basket"],
             x=comp_df["hhi"],
-            name="Concentration Index (HHI)",
+            showlegend=False,
             orientation="h",
             marker_color=[DANGER if h >= 2500 else (WARNING if h >= 1500 else SUCCESS) for h in comp_df["hhi"]],
             text=comp_df["hhi"].apply(lambda v: f"HHI {v:.0f}"),
             textposition="outside",
             hovertemplate="%{y}<br>Supplier Concentration HHI: %{x:.0f}<extra></extra>"
         ))
-        apply_plot_theme(fig_comp, title=f"Import Baskets Supplier Concentration Score (HHI) in {use_year}", x_title="Herfindahl-Hirschman Index (HHI)")
+        apply_plot_theme(fig_comp, x_title="Herfindahl-Hirschman Index (HHI)")
         fig_comp.add_vline(x=2500, line_dash="dash", line_color=DANGER, annotation_text="HHI = 2,500", annotation_position="top right")
         fig_comp.add_vline(x=1500, line_dash="dot", line_color=WARNING, annotation_text="HHI = 1,500", annotation_position="bottom right")
         # Explicit legend traces for color definitions
@@ -473,8 +423,8 @@ def render_tab_resilience(selected_year):
         fig_comp.add_trace(go.Bar(name="Low / Diversified (HHI < 1,500)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_comp.update_layout(
             showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=11)),
-            margin=dict(l=10, r=40, t=55, b=30),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
+            margin=dict(l=10, r=40, t=30, b=30),
             yaxis=dict(autorange="reversed")
         )
 
@@ -499,7 +449,9 @@ def render_tab_resilience(selected_year):
             marker=dict(size=6),
             hovertemplate="Exports: €%{y:.2f}B (%{x})<extra></extra>"
         ))
-        apply_plot_theme(fig_trajectory, title="25-Year Trajectory of Luxembourg Merchandise Trade Flows (2000–2026)", y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
+        apply_plot_theme(fig_trajectory, y_title="Billion Euros (€B)", dtick_x=2, hovermode="x unified")
+        fig_trajectory.update_yaxes(range=[7, 28])
+        fig_trajectory.update_layout(margin=dict(l=10, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
         colors = [SUCCESS if v >= 0 else DANGER for v in kpis_df["trade_balance_eur"]]
         fig_balance = go.Figure(go.Bar(
@@ -507,7 +459,8 @@ def render_tab_resilience(selected_year):
             marker_color=colors,
             hovertemplate="Trade Balance %{x}: €%{y:.2f}B<extra></extra>"
         ))
-        apply_plot_theme(fig_balance, title="Annual Merchandise Trade Balance (€B)", y_title="Billion Euros (€B)", dtick_x=2)
+        apply_plot_theme(fig_balance, y_title="Billion Euros (€B)", dtick_x=2)
+        fig_balance.update_layout(margin=dict(l=10, r=20, t=25, b=30))
 
         if "intra_eu_import_share_pct" in kpis_df.columns:
             fig_eu.add_trace(go.Scatter(
@@ -519,9 +472,9 @@ def render_tab_resilience(selected_year):
                 x=kpis_df["year"], y=kpis_df["intra_eu_export_share_pct"],
                 name="Intra-EU Export Share %", line=dict(color=PRIMARY, width=2.5), mode="lines+markers"
             ))
-        apply_plot_theme(fig_eu, title="European Integration: Share of Trade with EU Partners (%)", y_title="Share of Total (%)", dtick_x=2)
-        fig_eu.update_yaxes(range=[55, 95])
-        fig_eu.update_layout(margin=dict(l=10, r=20, t=35, b=30))
+        apply_plot_theme(fig_eu, y_title="Share of Total (%)", dtick_x=2)
+        fig_eu.update_yaxes(range=[55, 98])
+        fig_eu.update_layout(margin=dict(l=10, r=20, t=25, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
         v_start = kpis_df[kpis_df["year"] == kpis_df["year"].min()]["trade_volume_eur"].iloc[0]
         v_sub = kpis_df[kpis_df["year"] == use_year]
@@ -576,8 +529,8 @@ def render_tab_resilience(selected_year):
             textposition="outside",
             hovertemplate="%{y}: €%{x:.1f}M (%{text} of all imports)<extra></extra>"
         ))
-        apply_plot_theme(fig_non_eu, title="Top Non-EU Strategic Suppliers (Third-Country Exposure)", x_title="Million Euros (€M)")
-        fig_non_eu.update_layout(margin=dict(l=10, r=35, t=35, b=30), yaxis=dict(autorange="reversed"))
+        apply_plot_theme(fig_non_eu, x_title="Million Euros (€M)")
+        fig_non_eu.update_layout(margin=dict(l=10, r=35, t=10, b=30), yaxis=dict(autorange="reversed"))
 
     return html.Div([
         create_compact_kpi_ribbon(use_year),
@@ -593,10 +546,16 @@ def render_tab_resilience(selected_year):
         # Row 1: Macro Trajectory & Trade Balance
         dbc.Row([
             dbc.Col([
-                html.Div([dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})], className="dash-card")
+                html.Div([
+                    html.H6("25-YEAR TRAJECTORY OF MERCHANDISE TRADE FLOWS (2000–2026)", className="card-title-upper"),
+                    dcc.Graph(figure=fig_trajectory, config={"displayModeBar": False})
+                ], className="dash-card")
             ], md=8),
             dbc.Col([
-                html.Div([dcc.Graph(figure=fig_balance, config={"displayModeBar": False})], className="dash-card")
+                html.Div([
+                    html.H6("ANNUAL MERCHANDISE TRADE BALANCE (€B)", className="card-title-upper"),
+                    dcc.Graph(figure=fig_balance, config={"displayModeBar": False})
+                ], className="dash-card")
             ], md=4),
         ]),
 
@@ -611,12 +570,14 @@ def render_tab_resilience(selected_year):
 
             dbc.Col([
                 html.Div([
+                    html.H6("TOP NON-EU STRATEGIC SUPPLIERS", className="card-title-upper"),
                     dcc.Graph(figure=fig_non_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
 
             dbc.Col([
                 html.Div([
+                    html.H6("EUROPEAN SINGLE MARKET INTEGRATION", className="card-title-upper"),
                     dcc.Graph(figure=fig_eu, config={"displayModeBar": False}, className="chart-h-340")
                 ], className="dash-card")
             ], md=4),
@@ -642,6 +603,7 @@ def render_tab_resilience(selected_year):
         dbc.Row([
             dbc.Col([
                 html.Div([
+                    html.H6(f"IMPORT BASKETS SUPPLIER CONCENTRATION SCORE (HHI) IN {use_year}", className="card-title-upper"),
                     dcc.Graph(figure=fig_comp, config={"displayModeBar": False})
                 ], className="dash-card")
             ], md=12)
@@ -1143,8 +1105,11 @@ def update_q2_charts(flow, granularity, selected_prod, year):
                 marker=dict(size=4),
                 hovertemplate="%{x}: €%{y:,.1f}M<extra></extra>"
             ))
-    apply_plot_theme(fig_shift, title=f"25-Year Sector Evolution ({flow.capitalize()}) (€M)", y_title="Million Euros (€M)")
-    fig_shift.update_layout(margin=dict(l=10, r=20, t=30, b=30))
+    apply_plot_theme(fig_shift, y_title="Million Euros (€M)")
+    fig_shift.update_layout(
+        margin=dict(l=10, r=20, t=25, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
+    )
 
     barchart_title = f"Top 10 Traded Product {'Subheadings (HS4)' if granularity == 4 else 'Chapters (HS2)'} in {year}"
     shift_title = f"25-YEAR STRUCTURAL TRANSFORMATION OF PRODUCT {flow.upper()}S (2000–2025)"
@@ -1509,7 +1474,12 @@ def render_tab_benchmarks(selected_year):
                 marker=dict(size=6 if c == "LU" else 0),
                 hovertemplate="%{x}: Index %{y:.1f}<extra></extra>"
             ))
-    apply_plot_theme(fig_index, title="Merchandise Trade Volume Growth Index (Base 100 = Year 2000)", y_title="Index (2000 = 100)", dtick_x=2, hovermode="x unified")
+    apply_plot_theme(fig_index, y_title="Index (2000 = 100)", dtick_x=2, hovermode="x unified")
+    fig_index.update_yaxes(range=[80, 400])
+    fig_index.update_layout(
+        margin=dict(l=10, r=20, t=25, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
+    )
 
     sub_yr = bench_df[bench_df["year"] == selected_year]
     if sub_yr.empty:
@@ -1520,6 +1490,7 @@ def render_tab_benchmarks(selected_year):
     fig_cov = go.Figure(go.Bar(
         x=sub_yr["coverage_ratio_pct"],
         y=sub_yr["name"],
+        showlegend=False,
         orientation="h",
         marker_color=[STATEC_YELLOW if r == "LU" else (SUCCESS if v >= 100 else SECONDARY) for r, v in zip(sub_yr["reporter_code"], sub_yr["coverage_ratio_pct"])],
         text=sub_yr["coverage_ratio_pct"].apply(lambda v: f"{v:.1f}%"),
@@ -1527,7 +1498,7 @@ def render_tab_benchmarks(selected_year):
         hovertemplate="%{y}: Coverage Ratio %{x:.1f}%<extra></extra>"
     ))
     parity_threshold = 100.0
-    apply_plot_theme(fig_cov, title=f"Merchandise Trade Coverage Ratio in {selected_year} (Exports / Imports %)", x_title="Coverage Ratio (%)")
+    apply_plot_theme(fig_cov, x_title="Coverage Ratio (%)")
     fig_cov.add_vline(x=parity_threshold, line_dash="dash", line_color=SUCCESS, annotation_text=f"Trade Balance Parity ({parity_threshold:.0f}%)")
     # Legend traces for coverage ratio categories
     fig_cov.add_trace(go.Bar(name="Luxembourg", x=[None], y=[None], marker_color=STATEC_YELLOW, showlegend=True))
@@ -1535,8 +1506,8 @@ def render_tab_benchmarks(selected_year):
     fig_cov.add_trace(go.Bar(name="Trade Deficit (Ratio < 100%)", x=[None], y=[None], marker_color=SECONDARY, showlegend=True))
     fig_cov.update_layout(
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=11)),
-        margin=dict(l=10, r=40, t=55, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
+        margin=dict(l=10, r=40, t=25, b=30),
         yaxis=dict(autorange="reversed")
     )
 
@@ -1548,10 +1519,16 @@ def render_tab_benchmarks(selected_year):
 
         dbc.Row([
             dbc.Col([
-                html.Div([dcc.Graph(figure=fig_index, config={"displayModeBar": False})], className="dash-card")
+                html.Div([
+                    html.H6("MERCHANDISE TRADE VOLUME GROWTH INDEX (BASE 100 = 2000)", className="card-title-upper"),
+                    dcc.Graph(figure=fig_index, config={"displayModeBar": False})
+                ], className="dash-card")
             ], md=7),
             dbc.Col([
-                html.Div([dcc.Graph(figure=fig_cov, config={"displayModeBar": False})], className="dash-card")
+                html.Div([
+                    html.H6(f"TRADE COVERAGE RATIO IN {selected_year} (EXPORTS / IMPORTS %)", className="card-title-upper"),
+                    dcc.Graph(figure=fig_cov, config={"displayModeBar": False})
+                ], className="dash-card")
             ], md=5)
         ])
     ])
@@ -1633,12 +1610,14 @@ def render_tab_seasonality():
         dbc.Row([
             dbc.Col([
                 html.Div([
+                    html.H6("MONTHLY TRADE FLOW TIMESERIES & 12M TREND (€M)", className="card-title-upper"),
                     dcc.Graph(id="sea-timeseries-chart", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=8),
 
             dbc.Col([
                 html.Div([
+                    html.H6("MONTHLY SEASONAL FACTORS & DEVIATION", className="card-title-upper"),
                     dcc.Graph(id="sea-factors-chart", config={"displayModeBar": False}, className="chart-h-380")
                 ], className="dash-card")
             ], md=4)
@@ -1695,9 +1674,11 @@ def update_seasonality_charts(product, flow, selected_series):
             line=dict(color=SUCCESS, width=2, dash="dot"),
             hovertemplate="%{x}: SA €%{y:,.1f}M<extra></extra>"
         ))
-    prod_name_disp = sub['product_name'].iloc[0] if 'product_name' in sub.columns else f"Product {product}"
-    apply_plot_theme(fig_ts, title=f"Monthly {flow_lbl} Timeseries ({prod_name_disp}) (€M)", y_title="Million Euros (€M)", hovermode="x unified")
-    fig_ts.update_layout(margin=dict(l=10, r=20, t=35, b=30))
+    apply_plot_theme(fig_ts, y_title="Million Euros (€M)", hovermode="x unified")
+    fig_ts.update_layout(
+        margin=dict(l=10, r=20, t=25, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
+    )
 
     # Factors chart
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -1709,15 +1690,17 @@ def update_seasonality_charts(product, flow, selected_series):
         fig_factors = go.Figure(go.Bar(
             x=factors["month_name"],
             y=dev_m,
+            showlegend=False,
             marker_color=colors,
             text=[f"{v:+.1f}M" for v in dev_m],
             textposition="outside",
             hovertemplate="%{x}: Deviation %{text}<extra></extra>"
         ))
-        apply_plot_theme(fig_factors, title="Trade Balance Monthly Seasonal Deviation (€M vs Trend)", y_title="Deviation vs Trend (€M)")
+        apply_plot_theme(fig_factors, y_title="Deviation vs Trend (€M)")
         fig_factors.add_trace(go.Bar(name="Deficit Narrowing (> +€15M)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
         fig_factors.add_trace(go.Bar(name="Deficit Widening (< -€15M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+        y_vals = dev_m
     else:
         factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
@@ -1725,20 +1708,25 @@ def update_seasonality_charts(product, flow, selected_series):
         fig_factors = go.Figure(go.Bar(
             x=factors["month_name"],
             y=(factors["seasonal_factor"] - 1.0) * 100,
+            showlegend=False,
             marker_color=colors,
             text=factors["seasonal_factor"].apply(lambda f: f"{(f - 1.0)*100:+.1f}%"),
             textposition="outside",
             hovertemplate="%{x}: %{text}<extra></extra>"
         ))
-        apply_plot_theme(fig_factors, title=f"{flow_lbl} Seasonal Factors (% vs Annual Trend)", y_title="% vs Annual Trend")
+        apply_plot_theme(fig_factors, y_title="% vs Annual Trend")
         fig_factors.add_trace(go.Bar(name="Peak Month (> +5%)", x=[None], y=[None], marker_color=SUCCESS, showlegend=True))
         fig_factors.add_trace(go.Bar(name="Baseline Range", x=[None], y=[None], marker_color=STATEC_BLUE, showlegend=True))
         fig_factors.add_trace(go.Bar(name="August Slump", x=[None], y=[None], marker_color=DANGER, showlegend=True))
+        y_vals = (factors["seasonal_factor"] - 1.0) * 100
 
+    y_min, y_max = float(y_vals.min()), float(y_vals.max())
+    y_pad = max(abs(y_min), abs(y_max), 5.0) * 0.25
+    fig_factors.update_yaxes(range=[y_min - y_pad, y_max + y_pad])
     fig_factors.update_layout(
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10)),
-        margin=dict(l=10, r=30, t=55, b=30)
+        margin=dict(l=10, r=30, t=25, b=30)
     )
 
     return fig_ts, fig_factors
