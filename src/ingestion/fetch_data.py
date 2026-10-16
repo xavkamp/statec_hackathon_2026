@@ -228,7 +228,7 @@ def fetch_product_partners_csv(force_reload: bool = False) -> Path:
     return output_file
 
 
-def fetch_hs4_products_annual_csv(years: List[int] = [2020, 2021, 2022, 2023, 2024], force_reload: bool = False) -> Path:
+def fetch_hs4_products_annual_csv(years: List[int] = [2020, 2021, 2022, 2023, 2024, 2025], force_reload: bool = False) -> Path:
     """Fetch Luxembourg annual trade for all 4-digit HS subheadings directly to CSV."""
     output_file = RAW_DIR / "hs4_products_annual_raw.csv"
     if output_file.exists() and not force_reload:
