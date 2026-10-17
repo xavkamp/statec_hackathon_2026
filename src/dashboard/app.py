@@ -38,11 +38,11 @@ from src.dashboard.data_loader import (
 )
 
 from src.config import (
-    RESILIENCE_BASKETS, NON_CRITICAL_CHAPTERS, PEER_REPORTERS, PRIMARY_REPORTER,
+    RESILIENCE_BASKETS, ISO2_NAMES_EN, BENCHMARK_PRODUCT_LABELS, NON_CRITICAL_CHAPTERS, PEER_REPORTERS, PRIMARY_REPORTER,
     EU27_CODES, NEIGHBOUR_CODES, DEFAULT_PARTNER_OPTIONS, DEFAULT_DRILLDOWN_PARTNER,
 )
 from src.dashboard.common import (
-    ISO2_NAMES_EN, get_country_name, BASKET_FILTER_OPTIONS, basket_chapters,
+    get_country_name, BASKET_FILTER_OPTIONS, basket_chapters,
     basket_short_name, filter_by_chapters, resolve_year,
 )
 
@@ -1858,28 +1858,9 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year, metric="
 # ───────────────────────────────────────────────────────────────────────────
 # TAB 9: Q5 — REGIONAL PEER BENCHMARKING
 # ───────────────────────────────────────────────────────────────────────────
-BENCHMARK_PRODUCT_OPTIONS = [
-    {"label": "All Merchandise Trade (Total)", "value": "TOTAL"},
-    {"label": "87 — Vehicles & Automotive Equipment", "value": "87"},
-    {"label": "84 — Machinery & Mechanical Appliances", "value": "84"},
-    {"label": "85 — Electrical Machinery & Electronics", "value": "85"},
-    {"label": "30 — Pharmaceutical Products", "value": "30"},
-    {"label": "72 — Iron and Steel", "value": "72"},
-    {"label": "73 — Articles of Iron or Steel", "value": "73"},
-    {"label": "27 — Mineral Fuels & Energy", "value": "27"},
-    {"label": "39 — Plastics and Articles Thereof", "value": "39"},
-    {"label": "90 — Optical, Medical & Precision Instruments", "value": "90"},
-    {"label": "04 — Dairy Produce, Honey & Edible Products", "value": "04"},
-    {"label": "22 — Beverages, Spirits and Vinegar", "value": "22"},
-    {"label": "10 — Cereals and Grains", "value": "10"},
-    {"label": "76 — Aluminium and Articles Thereof", "value": "76"},
-    {"label": "40 — Rubber and Articles Thereof", "value": "40"},
-    {"label": "94 — Furniture & Lighting", "value": "94"},
-    {"label": "25 — Salt, Stone, Plaster & Cement", "value": "25"},
-    {"label": "48 — Paper and Paperboard", "value": "48"},
-    {"label": "62 — Apparel & Clothing Accessories", "value": "62"},
-    {"label": "88 — Aircraft, Spacecraft & Parts", "value": "88"},
-]
+BENCHMARK_PRODUCT_OPTIONS = [{"label": lbl, "value": code} for code, lbl in BENCHMARK_PRODUCT_LABELS.items()]
+
+
 def _extend_benchmark_options(options):
     """Append every chapter found in the benchmark data that has no curated label yet."""
     try:

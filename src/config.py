@@ -65,6 +65,31 @@ ALL_HS2_CHAPTERS = [f"{i:02d}" for i in range(1, 100)]
 SEASONAL_PRODUCTS = ["TOTAL"] + ALL_HS2_CHAPTERS
 BENCHMARK_PRODUCTS = ["TOTAL"] + ALL_HS2_CHAPTERS
 
+# Curated dropdown labels for the peer-benchmark tab (Tab 4), in display order. Any chapter in
+# BENCHMARK_PRODUCTS without an entry here is appended automatically using the name from the data.
+BENCHMARK_PRODUCT_LABELS = {
+    "TOTAL": "All Merchandise Trade (Total)",
+    "87": "87 — Vehicles & Automotive Equipment",
+    "84": "84 — Machinery & Mechanical Appliances",
+    "85": "85 — Electrical Machinery & Electronics",
+    "30": "30 — Pharmaceutical Products",
+    "72": "72 — Iron and Steel",
+    "73": "73 — Articles of Iron or Steel",
+    "27": "27 — Mineral Fuels & Energy",
+    "39": "39 — Plastics and Articles Thereof",
+    "90": "90 — Optical, Medical & Precision Instruments",
+    "04": "04 — Dairy Produce, Honey & Edible Products",
+    "22": "22 — Beverages, Spirits and Vinegar",
+    "10": "10 — Cereals and Grains",
+    "76": "76 — Aluminium and Articles Thereof",
+    "40": "40 — Rubber and Articles Thereof",
+    "94": "94 — Furniture & Lighting",
+    "25": "25 — Salt, Stone, Plaster & Cement",
+    "48": "48 — Paper and Paperboard",
+    "62": "62 — Apparel & Clothing Accessories",
+    "88": "88 — Aircraft, Spacecraft & Parts",
+}
+
 # Partners that get a hierarchical HS4 / CN8 drill-down (every partner has HS2 detail
 # through the product-partner table).
 KEY_PARTNERS = ["DE", "BE", "FR", "NL", "US", "CN", "IT", "GB", "PL", "CH"]
@@ -89,6 +114,20 @@ CRITICAL_BASKET_CHAPTERS = {
 }
 _CRITICAL_CHAPTER_SET = {ch for chs in CRITICAL_BASKET_CHAPTERS.values() for ch in chs}
 NON_CRITICAL_CHAPTERS = [ch for ch in ALL_HS2_CHAPTERS if ch not in _CRITICAL_CHAPTER_SET]
+
+ISO2_NAMES_EN = {
+    "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands",
+    "US": "United States", "IT": "Italy", "GB": "United Kingdom", "ES": "Spain",
+    "CN": "China", "CH": "Switzerland", "PL": "Poland", "AT": "Austria",
+    "SE": "Sweden", "JP": "Japan", "CZ": "Czechia", "DK": "Denmark",
+    "IE": "Ireland", "PT": "Portugal", "TR": "Turkey", "IN": "India",
+    "BR": "Brazil", "KR": "South Korea", "NO": "Norway", "RU": "Russia",
+    "CA": "Canada", "MX": "Mexico", "AU": "Australia", "ZA": "South Africa",
+    "HU": "Hungary", "RO": "Romania", "SG": "Singapore", "LU": "Luxembourg",
+    "FI": "Finland", "SK": "Slovakia", "GR": "Greece", "BG": "Bulgaria",
+    "HR": "Croatia", "SI": "Slovenia", "LT": "Lithuania", "LV": "Latvia",
+    "EE": "Estonia", "CY": "Cyprus", "MT": "Malta"
+}
 
 RESILIENCE_BASKETS = {
     "ALL": {

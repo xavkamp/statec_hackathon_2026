@@ -11,23 +11,11 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from src.config import (  # noqa: F401  (re-exported for the dashboard modules)
-    END_YEAR, RESILIENCE_BASKETS, EU27_CODES, NEIGHBOUR_CODES, TRANSIT_HUB_CODES,
+    END_YEAR, ISO2_NAMES_EN, RESILIENCE_BASKETS, EU27_CODES, NEIGHBOUR_CODES, TRANSIT_HUB_CODES,
 )
 from src.dashboard.design_system import apply_plot_theme, fmt_eur
 
-ISO2_NAMES_EN = {
-    "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands",
-    "US": "United States", "IT": "Italy", "GB": "United Kingdom", "ES": "Spain",
-    "CN": "China", "CH": "Switzerland", "PL": "Poland", "AT": "Austria",
-    "SE": "Sweden", "JP": "Japan", "CZ": "Czechia", "DK": "Denmark",
-    "IE": "Ireland", "PT": "Portugal", "TR": "Turkey", "IN": "India",
-    "BR": "Brazil", "KR": "South Korea", "NO": "Norway", "RU": "Russia",
-    "CA": "Canada", "MX": "Mexico", "AU": "Australia", "ZA": "South Africa",
-    "HU": "Hungary", "RO": "Romania", "SG": "Singapore", "LU": "Luxembourg",
-    "FI": "Finland", "SK": "Slovakia", "GR": "Greece", "BG": "Bulgaria",
-    "HR": "Croatia", "SI": "Slovenia", "LT": "Lithuania", "LV": "Latvia",
-    "EE": "Estonia", "CY": "Cyprus", "MT": "Malta"
-}
+
 
 
 
