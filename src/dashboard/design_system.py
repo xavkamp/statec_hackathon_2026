@@ -611,10 +611,7 @@ def get_concentration_badge(hhi: float):
 
 def create_dashboard_footer():
     """Institutional footer with English disclaimer for Hackathon 2026."""
-    try:
-        from src.config import START_YEAR, END_YEAR
-    except Exception:
-        START_YEAR, END_YEAR = 2000, 2025
+    from src.config import START_YEAR, END_YEAR
 
     return html.Footer([
         html.Div([

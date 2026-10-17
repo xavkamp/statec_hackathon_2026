@@ -15,6 +15,10 @@ from tests.test_dashboard import test_all_tabs, test_q2_hhi_and_charts, test_q5_
 from tests.test_basket_filters import test_all as test_basket_filtering
 from tests.test_year_range import test_year_range
 from tests.test_partner_drilldown import test_partner_drilldowns
+from tests.test_regressions import (
+    test_q4_year_and_share, test_q2_granularity_changes_fig32,
+    test_year_sensitive_figures, test_seasonality_year_and_sectors,
+)
 
 
 def run_all():
@@ -28,6 +32,8 @@ def run_all():
         ("Critical Basket Filters", [test_basket_filtering]),
         ("Dynamic Year Range & Labels", [test_year_range]),
         ("Partner Drill-down & Margins", [test_partner_drilldowns]),
+        ("Reported-Bug Regressions", [test_q4_year_and_share, test_q2_granularity_changes_fig32,
+                                      test_year_sensitive_figures, test_seasonality_year_and_sectors]),
     ]
 
     total_suites = len(suites)

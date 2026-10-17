@@ -1,7 +1,11 @@
 """Configuration constants for STATEC Hackathon 2026 - Luxembourg External Trade.
 Dataset: Eurostat ds-045409 (EU trade since 1988 by HS2-4-6 and CN8)
-Time span: 2000 - 2026
 Format: Tabular CSV
+
+EVERY tunable setting of the project lives in this file (analysis years, reporter and
+partner countries, product coverage, baskets, API tuning, dashboard defaults).
+After changing coverage settings re-run:  python run_pipeline.py --ingest --process
+(ingestion re-downloads automatically when the cached files don't cover the new settings).
 """
 
 from pathlib import Path
@@ -15,14 +19,31 @@ PROCESSED_DIR = DATA_DIR / "processed"
 # Eurostat Comext API
 COMEXT_API_URL = "https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/ds-045409"
 
-# Time span constraint: 2000 - 2025
+# Time span of the analysis (inclusive). Drives ingestion, processing and every dashboard
+# year selector / title.
 START_YEAR = 2000
 END_YEAR = 2025
 YEARS = [str(y) for y in range(START_YEAR, END_YEAR + 1)]
 
-# Reporters
+# Reporters: the country the dashboard is about, and the peers it is benchmarked against
+# (Tab 4). The primary reporter should be part of PEER_REPORTERS.
 PRIMARY_REPORTER = "LU"
 PEER_REPORTERS = ["LU", "BE", "DE", "FR", "NL"]
+
+# ── Partner country groups used by the dashboard (ISO-2 codes) ──
+EU27_CODES = {
+    "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU",
+    "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK",
+}
+NEIGHBOUR_CODES = {"BE", "DE", "FR"}      # "Direct neighbours" of the primary reporter
+TRANSIT_HUB_CODES = {"BE", "NL"}          # Logistics hubs (Antwerp / Rotterdam)
+
+# Fallback partner list for the drill-down dropdown when no ranking data is available
+DEFAULT_PARTNER_OPTIONS = ["DE", "BE", "FR", "NL", "US", "CN", "IT", "GB", "PL", "CH", "ES", "JP", "CZ", "TR", "AT"]
+DEFAULT_DRILLDOWN_PARTNER = "DE"
+
+# Parallel HTTP workers used by the ingestion step (lower if Eurostat throttles you)
+MAX_WORKERS = 4
 
 # Flow mapping
 FLOWS = {
@@ -36,6 +57,97 @@ INDICATOR_QUANTITY = "QUANTITY_IN_100KG"
 
 # Key HS2 chapters (01 to 99)
 ALL_HS2_CHAPTERS = [f"{i:02d}" for i in range(1, 100)]
+
+# ── Data coverage settings (shared by ingestion, processing and dashboard) ──
+# Products fetched for the monthly seasonality and peer-benchmark tables. Every HS2
+# chapter is included so that every critical basket (and the non-critical remainder)
+# has a complete list of selectable product sectors.
+SEASONAL_PRODUCTS = ["TOTAL"] + ALL_HS2_CHAPTERS
+BENCHMARK_PRODUCTS = ["TOTAL"] + ALL_HS2_CHAPTERS
+
+# Partners that get a hierarchical HS4 / CN8 drill-down (every partner has HS2 detail
+# through the product-partner table).
+KEY_PARTNERS = ["DE", "BE", "FR", "NL", "US", "CN", "IT", "GB", "PL", "CH"]
+
+# Number of largest lines retained per (year, flow[, partner]) for the detailed tiers.
+# Shares are always computed against the true HS2 flow totals, never the truncated sums.
+CN8_TOP_N_PER_YEAR_FLOW = 1000
+DRILLDOWN_TOP_N = 100
+
+# Number of years requested in one multi-year Eurostat call (keeps responses below the
+# API cell limit that answers HTTP 413).
+API_YEAR_WINDOW = 9
+
+# ── Canonical Resilience Radar baskets (HS2 chapters, always zero-padded) ──
+CRITICAL_BASKET_CHAPTERS = {
+    "ENERGY": ["27"],
+    "FOOD": ["01", "02", "03", "04", "10", "16", "19", "22"],
+    "HEALTH": ["30", "90"],
+    "METALS": ["72", "73", "25", "26", "76"],
+    "TECH": ["84", "85"],
+    "VEHICLES": ["87", "88"],
+}
+_CRITICAL_CHAPTER_SET = {ch for chs in CRITICAL_BASKET_CHAPTERS.values() for ch in chs}
+NON_CRITICAL_CHAPTERS = [ch for ch in ALL_HS2_CHAPTERS if ch not in _CRITICAL_CHAPTER_SET]
+
+RESILIENCE_BASKETS = {
+    "ALL": {
+        "name": "All Product Categories",
+        "short_name": "All Products",
+        "chapters": [],
+        "desc": "Complete merchandise trade scope across all tariff lines",
+        "filter_label": "All Product Categories",
+    },
+    "ENERGY": {
+        "name": "Energy & Fuels",
+        "short_name": "Energy & Fuels",
+        "chapters": CRITICAL_BASKET_CHAPTERS["ENERGY"],
+        "desc": "Refined petroleum, natural gas, electrical energy",
+        "filter_label": "Energy & Fuels (27)",
+    },
+    "FOOD": {
+        "name": "Food & Nutrition",
+        "short_name": "Food & Nutrition",
+        "chapters": CRITICAL_BASKET_CHAPTERS["FOOD"],
+        "desc": "Dairy, meat, cereals, beverages, essential nutrition",
+        "filter_label": "Food & Nutrition (01–04, 10, 16, 19, 22)",
+    },
+    "HEALTH": {
+        "name": "Health & Medicines",
+        "short_name": "Health & Medicines",
+        "chapters": CRITICAL_BASKET_CHAPTERS["HEALTH"],
+        "desc": "Pharmaceutical products, surgical & medical instruments",
+        "filter_label": "Health & Medicines (30, 90)",
+    },
+    "METALS": {
+        "name": "Raw Materials & Metals",
+        "short_name": "Raw Materials & Metals",
+        "chapters": CRITICAL_BASKET_CHAPTERS["METALS"],
+        "desc": "Iron, steel, aluminium, construction minerals",
+        "filter_label": "Raw Materials & Metals (25–26, 72–73, 76)",
+    },
+    "TECH": {
+        "name": "Tech & Machinery",
+        "short_name": "Tech & Machinery",
+        "chapters": CRITICAL_BASKET_CHAPTERS["TECH"],
+        "desc": "Computers, electrical generators, telecom apparatus",
+        "filter_label": "Tech & Machinery (84, 85)",
+    },
+    "VEHICLES": {
+        "name": "Vehicles & Transport",
+        "short_name": "Vehicles & Transport",
+        "chapters": CRITICAL_BASKET_CHAPTERS["VEHICLES"],
+        "desc": "Passenger cars, commercial transport equipment, aerospace",
+        "filter_label": "Vehicles & Transport (87, 88)",
+    },
+    "NON_CRITICAL": {
+        "name": "Other Non-Critical Categories",
+        "short_name": "Non-Critical Categories",
+        "chapters": NON_CRITICAL_CHAPTERS,
+        "desc": "All merchandise tariff lines outside the 6 designated critical resilience baskets (Plastics, Rubber, Chemicals, Wood, Textiles, Paper, etc.)",
+        "filter_label": "Other Non-Critical Categories",
+    },
+}
 
 # Standard HS Sections (World Customs Organization 21 sections)
 HS_SECTIONS = {

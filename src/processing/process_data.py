@@ -3,6 +3,12 @@ Reads raw extracted CSV tables from data/raw/, applies data cleansing,
 computes rankings, KPIs, seasonal decomposition, and peer benchmarks,
 and writes the processed tables directly as CSV in data/processed/.
 No Parquet or JSON formats are used.
+
+Design rules
+------------
+* Shares are always computed against the true flow totals derived from the complete
+  HS2 table, never against the (possibly truncated) detailed tiers.
+* Every table keeps its ``year`` column so the dashboard can honour the year selector.
 """
 
 import sys
@@ -16,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.config import RAW_DIR, PROCESSED_DIR, get_hs_section
+from src.config import RAW_DIR, PROCESSED_DIR, START_YEAR, get_hs_section
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,15 +33,50 @@ AGGREGATE_PARTNER_CODES = {
 }
 
 
-def process_overview_kpis() -> pd.DataFrame:
-    """Compute annual macro KPIs from raw partners CSV."""
-    raw_path = RAW_DIR / "partners_annual_raw.csv"
-    logger.info(f"Processing overview KPIs from {raw_path.name}")
-    df = pd.read_csv(raw_path)
+# ── Shared helpers ─────────────────────────────────────────────────────────
+def _read_raw(filename: str) -> pd.DataFrame:
+    return pd.read_csv(RAW_DIR / filename, dtype={"product": str, "time": str}, keep_default_na=False, na_values=[""])
 
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
+
+def _write(df: pd.DataFrame, filename: str) -> pd.DataFrame:
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_csv(PROCESSED_DIR / filename, index=False, encoding="utf-8")
+    logger.info(f"Saved {filename}: {len(df):,} rows")
+    return df
+
+
+def _clean_partner_name(label_series: pd.Series) -> pd.Series:
+    return label_series.apply(lambda s: str(s).split("(")[0].strip())
+
+
+def _add_year_flow_value(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardise the year / flow / value columns shared by every raw extract."""
+    df["year"] = pd.to_numeric(df["time"].astype(str).str[:4], errors="coerce").astype("int16")
     df["flow"] = df["flow_label"].str.upper()
     df["value_eur"] = pd.to_numeric(df["value"], errors="coerce")
+    return df
+
+
+def _rank_within(df: pd.DataFrame, group_cols, value_col: str = "value_eur") -> pd.Series:
+    return df.groupby(group_cols)[value_col].rank(method="first", ascending=False).astype(int)
+
+
+def _hs2_totals() -> pd.DataFrame:
+    """Complete HS2 table (all chapters) with flow totals - the reference for shares."""
+    df = _add_year_flow_value(_read_raw("hs2_products_annual_raw.csv"))
+    df["hs2_code"] = df["product"].astype(str).str.zfill(2)
+    df["value_eur"] = df["value_eur"].fillna(0.0)
+    df["flow_total_eur"] = df.groupby(["year", "flow"])["value_eur"].transform("sum")
+    return df[["year", "flow", "hs2_code", "value_eur", "flow_total_eur"]].rename(
+        columns={"value_eur": "chapter_value_eur"}
+    )
+
+
+# ── Overview ───────────────────────────────────────────────────────────────
+def process_overview_kpis() -> pd.DataFrame:
+    """Compute annual macro KPIs from raw partners CSV."""
+    logger.info("Processing overview KPIs from partners_annual_raw.csv")
+    df = _add_year_flow_value(_read_raw("partners_annual_raw.csv"))
 
     # Filter for WORLD total trade
     world_df = df[df["partner"] == "WORLD"].copy()
@@ -59,7 +100,6 @@ def process_overview_kpis() -> pd.DataFrame:
     # Intra-EU share: use INT_EU27_2020 preferentially; fall back to INT_EU when INT_EU27_2020 is absent
     eu27_df = df[df["partner"] == "INT_EU27_2020"].copy()
     eu_old_df = df[df["partner"] == "INT_EU"].copy()
-    # Combine: prefer INT_EU27_2020; use INT_EU for years missing from INT_EU27_2020
     eu27_years = set(eu27_df["year"].unique()) if not eu27_df.empty else set()
     eu_old_fill = eu_old_df[~eu_old_df["year"].isin(eu27_years)].copy() if not eu_old_df.empty else pd.DataFrame()
     eu_df = pd.concat([eu27_df, eu_old_fill], ignore_index=True)
@@ -76,23 +116,15 @@ def process_overview_kpis() -> pd.DataFrame:
         )
         pivoted = pivoted.drop(columns=["EXPORT_eu", "IMPORT_eu"], errors="ignore")
 
-    out_file = PROCESSED_DIR / "overview_kpis.csv"
-    pivoted.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(pivoted)} rows")
-    return pivoted
+    return _write(pivoted, "overview_kpis.csv")
 
 
 def process_partner_rankings() -> pd.DataFrame:
     """Compute partner rankings and market shares from raw partners CSV."""
-    raw_path = RAW_DIR / "partners_annual_raw.csv"
-    logger.info(f"Processing partner rankings from {raw_path.name}")
-    df = pd.read_csv(raw_path)
-
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["flow"] = df["flow_label"].str.upper()
+    logger.info("Processing partner rankings from partners_annual_raw.csv")
+    df = _add_year_flow_value(_read_raw("partners_annual_raw.csv"))
     df["partner_code"] = df["partner"]
-    df["partner_name"] = df["partner_label"].apply(lambda s: str(s).split("(")[0].strip())
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce")
+    df["partner_name"] = _clean_partner_name(df["partner_label"])
     df["is_aggregate"] = df["partner_code"].isin(AGGREGATE_PARTNER_CODES)
 
     countries_df = df[~df["is_aggregate"]].copy()
@@ -106,29 +138,19 @@ def process_partner_rankings() -> pd.DataFrame:
     countries_df["is_top_10"] = countries_df["rank"] <= 10
 
     cols = ["year", "flow", "partner_code", "partner_name", "value_eur", "total_eur", "market_share_pct", "rank", "cumulative_share_pct", "is_top_10"]
-    res = countries_df[cols].copy()
-
-    out_file = PROCESSED_DIR / "partner_rankings.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
+    return _write(countries_df[cols].copy(), "partner_rankings.csv")
 
 
+# ── Product tiers ──────────────────────────────────────────────────────────
 def process_product_rankings() -> pd.DataFrame:
     """Compute HS2 product rankings, sections, and structural shifts from raw HS2 CSV."""
-    raw_path = RAW_DIR / "hs2_products_annual_raw.csv"
-    logger.info(f"Processing product rankings from {raw_path.name}")
-    df = pd.read_csv(raw_path)
-
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["flow"] = df["flow_label"].str.upper()
+    logger.info("Processing product rankings from hs2_products_annual_raw.csv")
+    df = _add_year_flow_value(_read_raw("hs2_products_annual_raw.csv"))
     df["hs2_code"] = df["product"].astype(str).str.zfill(2)
     df["hs2_name"] = df["product_label"]
     df["hs_section"] = df["hs2_code"].apply(get_hs_section)
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce")
 
-    totals = df.groupby(["year", "flow"])["value_eur"].transform("sum")
-    df["total_eur"] = totals
+    df["total_eur"] = df.groupby(["year", "flow"])["value_eur"].transform("sum")
     df["product_share_pct"] = (df["value_eur"] / df["total_eur"]) * 100
 
     df = df.sort_values(by=["year", "flow", "value_eur"], ascending=[True, True, False])
@@ -136,26 +158,74 @@ def process_product_rankings() -> pd.DataFrame:
     df["cumulative_share_pct"] = df.groupby(["year", "flow"])["product_share_pct"].cumsum()
     df["is_top_10"] = df["rank"] <= 10
 
-    # Base year 2000 index
-    base_2000 = df[df["year"] == 2000].set_index(["flow", "hs2_code"])["value_eur"].to_dict()
-    df["base_2000_val"] = df.apply(lambda r: base_2000.get((r["flow"], r["hs2_code"]), np.nan), axis=1)
-    df["index_2000"] = np.where(df["base_2000_val"] > 0, (df["value_eur"] / df["base_2000_val"]) * 100, np.nan)
-    df = df.drop(columns=["base_2000_val"])
+    # Base year index (vectorised lookup of the first-year value per flow and chapter)
+    base = (
+        df[df["year"] == START_YEAR][["flow", "hs2_code", "value_eur"]]
+        .rename(columns={"value_eur": "base_val"})
+    )
+    df = df.merge(base, on=["flow", "hs2_code"], how="left")
+    df["index_2000"] = np.where(df["base_val"] > 0, (df["value_eur"] / df["base_val"]) * 100, np.nan)
 
     cols = ["year", "flow", "hs2_code", "hs2_name", "hs_section", "value_eur", "total_eur", "product_share_pct", "rank", "cumulative_share_pct", "is_top_10", "index_2000"]
-    res = df[cols].copy()
-
-    out_file = PROCESSED_DIR / "product_rankings.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
+    return _write(df[cols].copy(), "product_rankings.csv")
 
 
+def _process_detailed_tier(raw_name: str, out_name: str, level: int) -> pd.DataFrame:
+    """HS4 headings / CN8 tariff lines ranked per year and flow.
+
+    ``total_eur`` and ``share_in_chapter_pct`` use the complete HS2 table as the
+    denominator so truncated tiers (top-N CN8 lines) still report correct shares.
+    """
+    raw_path = RAW_DIR / raw_name
+    if not raw_path.exists():
+        logger.warning(f"{raw_name} not found, skipping {out_name}.")
+        return pd.DataFrame()
+
+    logger.info(f"Processing {level}-digit lines from {raw_name}")
+    df = _add_year_flow_value(_read_raw(raw_name))
+    code_col, name_col = f"hs{level}_code", f"hs{level}_name"
+    df[code_col] = df["product"].astype(str).str.zfill(level)
+    df[name_col] = df["product_label"]
+    df["hs2_parent"] = df[code_col].str[:2]
+    if level == 8:
+        df["hs4_parent"] = df[code_col].str[:4]
+    df["hs_section"] = df["hs2_parent"].apply(get_hs_section)
+    df["value_eur"] = df["value_eur"].fillna(0.0)
+    df = df[df["value_eur"] > 0].copy()
+
+    ref = _hs2_totals()
+    flow_totals = ref.drop_duplicates(["year", "flow"])[["year", "flow", "flow_total_eur"]]
+    chapter_totals = ref[["year", "flow", "hs2_code", "chapter_value_eur"]].rename(columns={"hs2_code": "hs2_parent"})
+    df = df.merge(flow_totals, on=["year", "flow"], how="left").merge(chapter_totals, on=["year", "flow", "hs2_parent"], how="left")
+    df["total_eur"] = df["flow_total_eur"]
+    df["product_share_pct"] = np.where(df["total_eur"] > 0, (df["value_eur"] / df["total_eur"]) * 100, 0.0)
+    df["share_in_chapter_pct"] = np.where(df["chapter_value_eur"] > 0, (df["value_eur"] / df["chapter_value_eur"]) * 100, 0.0)
+
+    df = df.sort_values(by=["year", "flow", "value_eur"], ascending=[True, True, False])
+    df["overall_rank"] = df.groupby(["year", "flow"]).cumcount() + 1
+    df["rank_in_chapter"] = df.groupby(["year", "flow", "hs2_parent"]).cumcount() + 1
+
+    parents = ["hs2_parent", "hs4_parent"] if level == 8 else ["hs2_parent"]
+    cols = ["year", "flow", code_col, name_col, *parents, "hs_section", "value_eur", "total_eur",
+            "product_share_pct", "share_in_chapter_pct", "overall_rank", "rank_in_chapter"]
+    return _write(df[cols].copy(), out_name)
+
+
+def process_hs4_products() -> pd.DataFrame:
+    """Compute 4-digit HS heading rankings and parent chapter contributions."""
+    return _process_detailed_tier("hs4_products_annual_raw.csv", "hs4_product_rankings.csv", 4)
+
+
+def process_hs8_products() -> pd.DataFrame:
+    """Compute 8-digit CN tariff line rankings and parent chapter contributions."""
+    return _process_detailed_tier("hs8_products_annual_raw.csv", "hs8_product_rankings.csv", 8)
+
+
+# ── Seasonality ────────────────────────────────────────────────────────────
 def process_seasonal_decomposition() -> pd.DataFrame:
     """Decompose monthly time-series into trend, seasonal factor, adjusted series, and residuals."""
-    raw_path = RAW_DIR / "monthly_seasonality_raw.csv"
-    logger.info(f"Processing seasonal decomposition from {raw_path.name}")
-    df = pd.read_csv(raw_path)
+    logger.info("Processing seasonal decomposition from monthly_seasonality_raw.csv")
+    df = _read_raw("monthly_seasonality_raw.csv")
 
     df["time_str"] = df["time"].astype(str)
     parts = df["time_str"].str.split("-", expand=True)
@@ -173,7 +243,7 @@ def process_seasonal_decomposition() -> pd.DataFrame:
 
         # 12-month centered rolling moving average for trend
         g["trend_eur"] = g["value_eur"].rolling(window=12, center=True, min_periods=6).mean()
-        # Detrended ratio
+        # Detrended ratio (kept in the output so the dashboard can re-estimate factors per period)
         g["ratio_to_trend"] = np.where(g["trend_eur"] > 0, g["value_eur"] / g["trend_eur"], np.nan)
         # Monthly factor (median of ratio for that calendar month)
         monthly_factors = g.groupby("month")["ratio_to_trend"].transform("median")
@@ -189,35 +259,27 @@ def process_seasonal_decomposition() -> pd.DataFrame:
         results.append(g)
 
     res_df = pd.concat(results, ignore_index=True)
-    cols = ["date", "year", "month", "product_code", "product_name", "flow", "value_eur", "trend_eur", "seasonal_factor", "seasonally_adjusted_eur", "residual_eur"]
-    res = res_df[cols].copy()
-
-    out_file = PROCESSED_DIR / "seasonal_decomposition.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
+    cols = ["date", "year", "month", "product_code", "product_name", "flow", "value_eur", "trend_eur",
+            "ratio_to_trend", "seasonal_factor", "seasonally_adjusted_eur", "residual_eur"]
+    return _write(res_df[cols].copy(), "seasonal_decomposition.csv")
 
 
+# ── Peer benchmarks ────────────────────────────────────────────────────────
 def process_country_benchmarks() -> pd.DataFrame:
     """Compute comparative trade metrics across Luxembourg and peer countries by product."""
-    raw_path = RAW_DIR / "country_benchmarks_annual_raw.csv"
-    logger.info(f"Processing country benchmarks from {raw_path.name}")
-    df = pd.read_csv(raw_path)
+    logger.info("Processing country benchmarks from country_benchmarks_annual_raw.csv")
+    df = _read_raw("country_benchmarks_annual_raw.csv")
 
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
+    df["year"] = pd.to_numeric(df["time"].astype(str).str[:4], errors="coerce").astype("int16")
     df["reporter_code"] = df["reporter"]
-    df["reporter_name"] = df["reporter_label"].apply(lambda s: str(s).split("(")[0].strip())
+    df["reporter_name"] = _clean_partner_name(df["reporter_label"])
     df["product_code"] = df["product"].astype(str)
     df["product_name"] = df["product_label"].astype(str) if "product_label" in df.columns else df["product_code"]
     df["flow"] = df["flow_label"].str.upper()
     df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
 
-    piv = df.pivot_table(
-        index=["year", "reporter_code", "reporter_name", "product_code", "product_name"],
-        columns="flow",
-        values="value_eur",
-        aggfunc="sum"
-    ).reset_index()
+    keys = ["year", "reporter_code", "reporter_name", "product_code", "product_name"]
+    piv = df.pivot_table(index=keys, columns="flow", values="value_eur", aggfunc="sum").reset_index()
     piv.columns.name = None
 
     if "EXPORT" not in piv.columns:
@@ -230,82 +292,23 @@ def process_country_benchmarks() -> pd.DataFrame:
     piv["coverage_ratio_pct"] = np.where(piv["IMPORT"] > 0, (piv["EXPORT"] / piv["IMPORT"]) * 100, np.nan)
 
     piv = piv.sort_values(["reporter_code", "product_code", "year"])
-    base_years = piv[piv["year"] == 2000].set_index(["reporter_code", "product_code"])
-    base_export = base_years["EXPORT"].to_dict()
-    base_import = base_years["IMPORT"].to_dict()
-    base_volume = base_years["trade_volume_eur"].to_dict()
-
-    piv["export_index_2000"] = piv.apply(
-        lambda r: (r["EXPORT"] / base_export.get((r["reporter_code"], r["product_code"]), 0)) * 100
-        if base_export.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
+    pair = ["reporter_code", "product_code"]
+    base = piv.loc[piv["year"] == START_YEAR, pair + ["EXPORT", "IMPORT", "trade_volume_eur"]].rename(
+        columns={"EXPORT": "base_export", "IMPORT": "base_import", "trade_volume_eur": "base_volume"}
     )
-    piv["import_index_2000"] = piv.apply(
-        lambda r: (r["IMPORT"] / base_import.get((r["reporter_code"], r["product_code"]), 0)) * 100
-        if base_import.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
-    )
-    piv["volume_index_2000"] = piv.apply(
-        lambda r: (r["trade_volume_eur"] / base_volume.get((r["reporter_code"], r["product_code"]), 0)) * 100
-        if base_volume.get((r["reporter_code"], r["product_code"]), 0) > 0 else np.nan, axis=1
-    )
+    piv = piv.merge(base, on=pair, how="left")
+    for col, base_col, out_col in [
+        ("EXPORT", "base_export", "export_index_base"),
+        ("IMPORT", "base_import", "import_index_base"),
+        ("trade_volume_eur", "base_volume", "volume_index_base"),
+    ]:
+        piv[out_col] = np.where(piv[base_col] > 0, (piv[col] / piv[base_col]) * 100, np.nan)
+    piv = piv.drop(columns=["base_export", "base_import", "base_volume"])
 
-    out_file = PROCESSED_DIR / "country_benchmarks.csv"
-    piv.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(piv)} rows")
-    return piv
+    return _write(piv, "country_benchmarks.csv")
 
 
-def process_partner_drilldown() -> pd.DataFrame:
-    """Pre-aggregate partner drilldown data across 2-digit, 4-digit, and 8-digit CN8 codes."""
-    raw_path = RAW_DIR / "partner_drilldown_raw.csv"
-    logger.info(f"Processing partner drilldown from {raw_path.name}")
-    if not raw_path.exists():
-        logger.warning(f"{raw_path.name} not found, skipping drilldown processing.")
-        return pd.DataFrame()
-
-    df = pd.read_csv(raw_path)
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["partner_code"] = df["partner"]
-    df["partner_name"] = df["partner_label"].apply(lambda s: str(s).split("(")[0].strip())
-    df["flow"] = df["flow_label"].str.upper()
-    df["product_code"] = df["product"].astype(str)
-    df["product_name"] = df["product_label"]
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce")
-
-    df["code_level"] = df["product_code"].str.len().astype("int8")
-    df["hs2_parent"] = df["product_code"].str[:2]
-    df["hs4_parent"] = np.where(df["code_level"] >= 4, df["product_code"].str[:4], None)
-    df["hs6_parent"] = np.where(df["code_level"] >= 6, df["product_code"].str[:6], None)
-    df["hs_section"] = df["hs2_parent"].apply(get_hs_section)
-
-    lvl2 = df[df["code_level"] == 2].copy()
-    lvl4 = df[df["code_level"] == 4].copy()
-    lvl8 = df[df["code_level"] == 8].copy()
-
-    # Calculate level 2 share
-    tot = lvl2.groupby(["partner_code", "flow"])["value_eur"].transform("sum")
-    lvl2["chapter_share_pct"] = (lvl2["value_eur"] / tot) * 100
-    lvl2 = lvl2.sort_values(by=["partner_code", "flow", "value_eur"], ascending=[True, True, False])
-    lvl2["rank_in_partner"] = lvl2.groupby(["partner_code", "flow"]).cumcount() + 1
-    lvl2["is_significant"] = lvl2["rank_in_partner"] <= 10
-
-    out_lvl2 = PROCESSED_DIR / "partner_drilldown_lvl2.csv"
-    lvl2.to_csv(out_lvl2, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_lvl2.name}: {len(lvl2):,} rows")
-
-    out_lvl4 = PROCESSED_DIR / "partner_drilldown_lvl4.csv"
-    lvl4.to_csv(out_lvl4, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_lvl4.name}: {len(lvl4):,} rows")
-
-    # Keep top 100 CN8 lines per partner and flow for fast UI rendering
-    lvl8 = lvl8.sort_values(by=["partner_code", "flow", "value_eur"], ascending=[True, True, False])
-    top_lvl8 = lvl8.groupby(["partner_code", "flow"]).head(100).copy()
-    out_lvl8 = PROCESSED_DIR / "partner_drilldown_lvl8.csv"
-    top_lvl8.to_csv(out_lvl8, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_lvl8.name}: {len(top_lvl8):,} rows")
-
-    return lvl2
-
-
+# ── Partner x product tables ───────────────────────────────────────────────
 def process_product_partners() -> pd.DataFrame:
     """Compute partner rankings and concentration metrics for each HS2 product category (Q3)."""
     raw_path = RAW_DIR / "product_partners_raw.csv"
@@ -314,40 +317,34 @@ def process_product_partners() -> pd.DataFrame:
         return pd.DataFrame()
 
     logger.info(f"Processing product partners from {raw_path.name}")
-    df = pd.read_csv(raw_path)
-
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["flow"] = df["flow_label"].str.upper()
+    df = _add_year_flow_value(_read_raw("product_partners_raw.csv"))
     df["hs2_code"] = df["product"].astype(str).str.zfill(2)
     df["hs2_name"] = df["product_label"]
     df["hs_section"] = df["hs2_code"].apply(get_hs_section)
     df["partner_code"] = df["partner"]
-    df["partner_name"] = df["partner_label"].apply(lambda s: str(s).split("(")[0].strip())
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
+    df["partner_name"] = _clean_partner_name(df["partner_label"])
+    df["value_eur"] = df["value_eur"].fillna(0.0)
 
     # Exclude aggregate partner codes
     df = df[~df["partner_code"].isin(AGGREGATE_PARTNER_CODES)].copy()
     df = df[df["value_eur"] > 0].copy()
 
-    # Total trade per product, year, flow
-    totals = df.groupby(["year", "flow", "hs2_code"])["value_eur"].transform("sum")
-    df["total_eur"] = totals
+    keys = ["year", "flow", "hs2_code"]
+    df["total_eur"] = df.groupby(keys)["value_eur"].transform("sum")
     df["partner_share_pct"] = np.where(df["total_eur"] > 0, (df["value_eur"] / df["total_eur"]) * 100, 0.0)
 
     # Sort and rank partners
-    df = df.sort_values(by=["year", "flow", "hs2_code", "value_eur"], ascending=[True, True, True, False])
-    df["rank"] = df.groupby(["year", "flow", "hs2_code"]).cumcount() + 1
-    df["cumulative_share_pct"] = df.groupby(["year", "flow", "hs2_code"])["partner_share_pct"].cumsum()
+    df = df.sort_values(by=keys + ["value_eur"], ascending=[True, True, True, False])
+    df["rank"] = df.groupby(keys).cumcount() + 1
+    df["cumulative_share_pct"] = df.groupby(keys)["partner_share_pct"].cumsum()
 
-    # Herfindahl-Hirschman Index (HHI) for concentration
-    hhi_df = df.groupby(["year", "flow", "hs2_code"])["partner_share_pct"].apply(lambda s: (s ** 2).sum()).reset_index()
-    hhi_df = hhi_df.rename(columns={"partner_share_pct": "hhi"})
-    hhi_df["concentration_level"] = np.where(
-        hhi_df["hhi"] >= 2500, "High Concentration",
-        np.where(hhi_df["hhi"] >= 1500, "Moderate Concentration", "Diversified")
+    # Herfindahl-Hirschman Index (HHI) for concentration (vectorised)
+    df["_sq_share"] = df["partner_share_pct"] ** 2
+    df["hhi"] = df.groupby(keys)["_sq_share"].transform("sum")
+    df["concentration_level"] = np.where(
+        df["hhi"] >= 2500, "High Concentration",
+        np.where(df["hhi"] >= 1500, "Moderate Concentration", "Diversified")
     )
-
-    df = df.merge(hhi_df, on=["year", "flow", "hs2_code"], how="left")
 
     cols = [
         "year", "flow", "hs2_code", "hs2_name", "hs_section",
@@ -355,109 +352,79 @@ def process_product_partners() -> pd.DataFrame:
         "partner_share_pct", "rank", "cumulative_share_pct",
         "hhi", "concentration_level"
     ]
-    res = df[cols].copy()
-
-    out_file = PROCESSED_DIR / "product_partners.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
+    return _write(df[cols].copy(), "product_partners.csv")
 
 
-def process_hs4_products() -> pd.DataFrame:
-    """Compute 4-digit HS subheading rankings and parent chapter contributions."""
-    raw_path = RAW_DIR / "hs4_products_annual_raw.csv"
-    if not raw_path.exists():
-        logger.warning(f"{raw_path.name} not found, skipping HS4 processing.")
+def build_hs2_drilldown(pp_df: pd.DataFrame) -> pd.DataFrame:
+    """HS2 tier of the partner drill-down, derived from the product-partner table.
+
+    Works for *every* partner and year. ``share_pct`` is the chapter's share of the
+    partner's complete flow in that year (sum of all HS2 chapters), so the Value and
+    Share views of Figure 2.4 always describe the same year.
+    """
+    group = ["year", "partner_code", "flow"]
+    lvl2 = pp_df.rename(columns={"hs2_code": "product_code", "hs2_name": "product_name"})[
+        ["year", "partner_code", "partner_name", "flow", "product_code", "product_name", "hs_section", "value_eur"]
+    ].copy()
+    lvl2["code_level"] = 2
+    lvl2["hs2_parent"] = lvl2["product_code"]
+    lvl2["partner_flow_total_eur"] = lvl2.groupby(group)["value_eur"].transform("sum")
+    lvl2["share_pct"] = np.where(
+        lvl2["partner_flow_total_eur"] > 0, lvl2["value_eur"] / lvl2["partner_flow_total_eur"] * 100, 0.0
+    )
+    lvl2["chapter_share_pct"] = lvl2["share_pct"]
+    lvl2["rank_in_partner"] = _rank_within(lvl2, group)
+    lvl2["is_significant"] = lvl2["rank_in_partner"] <= 10
+    return lvl2.sort_values(["year", "partner_code", "flow", "value_eur"], ascending=[True, True, True, False])
+
+
+def process_partner_drilldown(pp_df: pd.DataFrame = None) -> pd.DataFrame:
+    """Build the HS4 / CN8 drill-down tables used by Figure 2.4.
+
+    * Levels 4 and 8 come from the key-partner extract (largest lines per year).
+    * ``share_pct`` is the line's share of the partner's total flow in that year, taken
+      from the complete HS2 sum of the product-partner table.
+    * The HS2 tier is not persisted: see :func:`build_hs2_drilldown`.
+    """
+    if pp_df is None:
+        pp_path = PROCESSED_DIR / "product_partners.csv"
+        pp_df = pd.read_csv(pp_path, dtype={"hs2_code": str, "partner_code": str}, keep_default_na=False, na_values=[""]) if pp_path.exists() else pd.DataFrame()
+    if pp_df.empty:
+        logger.warning("No product-partner table available, skipping drilldown processing.")
         return pd.DataFrame()
 
-    logger.info(f"Processing 4-digit HS subheadings from {raw_path.name}")
-    df = pd.read_csv(raw_path)
-
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["flow"] = df["flow_label"].str.upper()
-    df["hs4_code"] = df["product"].astype(str).str.zfill(4)
-    df["hs4_name"] = df["product_label"]
-    df["hs2_parent"] = df["hs4_code"].str[:2]
-    df["hs_section"] = df["hs2_parent"].apply(get_hs_section)
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
-
-    # Filter positive trade values
-    df = df[df["value_eur"] > 0].copy()
-
-    # Total trade per year and flow
-    totals = df.groupby(["year", "flow"])["value_eur"].transform("sum")
-    df["total_eur"] = totals
-    df["product_share_pct"] = np.where(df["total_eur"] > 0, (df["value_eur"] / df["total_eur"]) * 100, 0.0)
-
-    # Contribution within parent 2-digit chapter
-    ch_totals = df.groupby(["year", "flow", "hs2_parent"])["value_eur"].transform("sum")
-    df["share_in_chapter_pct"] = np.where(ch_totals > 0, (df["value_eur"] / ch_totals) * 100, 0.0)
-
-    # Overall rank and rank within chapter
-    df = df.sort_values(by=["year", "flow", "value_eur"], ascending=[True, True, False])
-    df["overall_rank"] = df.groupby(["year", "flow"]).cumcount() + 1
-    df["rank_in_chapter"] = df.groupby(["year", "flow", "hs2_parent"]).cumcount() + 1
-
-    cols = [
-        "year", "flow", "hs4_code", "hs4_name", "hs2_parent", "hs_section",
-        "value_eur", "total_eur", "product_share_pct", "share_in_chapter_pct",
-        "overall_rank", "rank_in_chapter"
-    ]
-    res = df[cols].copy()
-
-    out_file = PROCESSED_DIR / "hs4_product_rankings.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
-
-
-def process_hs8_products() -> pd.DataFrame:
-    """Compute 8-digit CN tariff line rankings and parent chapter contributions."""
-    raw_path = RAW_DIR / "hs8_products_annual_raw.csv"
+    raw_path = RAW_DIR / "partner_drilldown_raw.csv"
     if not raw_path.exists():
-        logger.warning(f"{raw_path.name} not found, skipping HS8 processing.")
+        logger.warning(f"{raw_path.name} not found, skipping HS4/CN8 drilldown processing.")
         return pd.DataFrame()
 
-    logger.info(f"Processing 8-digit CN tariff lines from {raw_path.name}")
-    df = pd.read_csv(raw_path)
+    group = ["year", "partner_code", "flow"]
+    totals = (
+        pp_df.groupby(group)["value_eur"].sum().rename("partner_flow_total_eur").reset_index()
+    )
 
-    df["year"] = pd.to_numeric(df["time"], errors="coerce").astype("int16")
-    df["flow"] = df["flow_label"].str.upper()
-    df["hs8_code"] = df["product"].astype(str).str.zfill(8)
-    df["hs8_name"] = df["product_label"]
-    df["hs2_parent"] = df["hs8_code"].str[:2]
-    df["hs4_parent"] = df["hs8_code"].str[:4]
+    logger.info(f"Processing partner drilldown from {raw_path.name}")
+    df = _add_year_flow_value(_read_raw("partner_drilldown_raw.csv"))
+    df["partner_code"] = df["partner"]
+    df["partner_name"] = _clean_partner_name(df["partner_label"])
+    df["product_code"] = df["product"].astype(str)
+    df["product_name"] = df["product_label"]
+    df["code_level"] = df["product_code"].str.len().astype("int8")
+    df["hs2_parent"] = df["product_code"].str[:2]
+    df["hs4_parent"] = np.where(df["code_level"] >= 4, df["product_code"].str[:4], None)
     df["hs_section"] = df["hs2_parent"].apply(get_hs_section)
-    df["value_eur"] = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
+    df = df[df["value_eur"] > 0].merge(totals, on=group, how="left")
+    df["share_pct"] = np.where(
+        df["partner_flow_total_eur"] > 0, df["value_eur"] / df["partner_flow_total_eur"] * 100, np.nan
+    )
 
-    # Filter positive trade values
-    df = df[df["value_eur"] > 0].copy()
+    for level, name in [(4, "partner_drilldown_lvl4.csv"), (8, "partner_drilldown_lvl8.csv")]:
+        tier = df[df["code_level"] == level].copy()
+        tier["rank_in_partner"] = _rank_within(tier, group)
+        tier = tier.sort_values(["year", "partner_code", "flow", "value_eur"], ascending=[True, True, True, False])
+        _write(tier, name)
 
-    # Total trade per year and flow
-    totals = df.groupby(["year", "flow"])["value_eur"].transform("sum")
-    df["total_eur"] = totals
-    df["product_share_pct"] = np.where(df["total_eur"] > 0, (df["value_eur"] / df["total_eur"]) * 100, 0.0)
-
-    # Contribution within parent 2-digit chapter
-    ch_totals = df.groupby(["year", "flow", "hs2_parent"])["value_eur"].transform("sum")
-    df["share_in_chapter_pct"] = np.where(ch_totals > 0, (df["value_eur"] / ch_totals) * 100, 0.0)
-
-    # Overall rank and rank within chapter
-    df = df.sort_values(by=["year", "flow", "value_eur"], ascending=[True, True, False])
-    df["overall_rank"] = df.groupby(["year", "flow"]).cumcount() + 1
-    df["rank_in_chapter"] = df.groupby(["year", "flow", "hs2_parent"]).cumcount() + 1
-
-    cols = [
-        "year", "flow", "hs8_code", "hs8_name", "hs2_parent", "hs4_parent", "hs_section",
-        "value_eur", "total_eur", "product_share_pct", "share_in_chapter_pct",
-        "overall_rank", "rank_in_chapter"
-    ]
-    res = df[cols].copy()
-
-    out_file = PROCESSED_DIR / "hs8_product_rankings.csv"
-    res.to_csv(out_file, index=False, encoding="utf-8")
-    logger.info(f"Saved {out_file.name}: {len(res):,} rows")
-    return res
+    return df
 
 
 def run_all_processing():
@@ -469,8 +436,8 @@ def run_all_processing():
     process_product_rankings()
     process_seasonal_decomposition()
     process_country_benchmarks()
-    process_partner_drilldown()
-    process_product_partners()
+    pp = process_product_partners()      # must run before the drill-down (HS2 tier)
+    process_partner_drilldown(pp)
     process_hs4_products()
     process_hs8_products()
     logger.info("=== Tabular CSV Processing Completed Successfully ===")
@@ -478,5 +445,3 @@ def run_all_processing():
 
 if __name__ == "__main__":
     run_all_processing()
-
-

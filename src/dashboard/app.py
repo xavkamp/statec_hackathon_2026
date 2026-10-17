@@ -37,90 +37,14 @@ from src.dashboard.data_loader import (
     load_country_benchmarks, load_drilldown_lvl2, load_drilldown_lvl4, load_drilldown_lvl8
 )
 
-ISO2_NAMES_EN = {
-    "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands",
-    "US": "United States", "IT": "Italy", "GB": "United Kingdom", "ES": "Spain",
-    "CN": "China", "CH": "Switzerland", "PL": "Poland", "AT": "Austria",
-    "SE": "Sweden", "JP": "Japan", "CZ": "Czechia", "DK": "Denmark",
-    "IE": "Ireland", "PT": "Portugal", "TR": "Turkey", "IN": "India",
-    "BR": "Brazil", "KR": "South Korea", "NO": "Norway", "RU": "Russia",
-    "CA": "Canada", "MX": "Mexico", "AU": "Australia", "ZA": "South Africa",
-    "HU": "Hungary", "RO": "Romania", "SG": "Singapore", "LU": "Luxembourg",
-    "FI": "Finland", "SK": "Slovakia", "GR": "Greece", "BG": "Bulgaria",
-    "HR": "Croatia", "SI": "Slovenia", "LT": "Lithuania", "LV": "Latvia",
-    "EE": "Estonia", "CY": "Cyprus", "MT": "Malta"
-}
-
-def get_country_name(code: str) -> str:
-    c = str(code).upper().strip()
-    return ISO2_NAMES_EN.get(c, c)
-
-
-# ── Canonical Resilience Radar Baskets ─────────────────────────────────────
-_CRITICAL_CHS = {"27", "01", "02", "03", "04", "10", "16", "19", "22", "30", "90", "72", "73", "25", "26", "76", "84", "85", "87", "88", "1", "2", "3", "4"}
-NON_CRITICAL_CHAPTERS = [f"{i:02d}" for i in range(1, 100) if f"{i:02d}" not in _CRITICAL_CHS] + [str(i) for i in range(1, 100) if f"{i:02d}" not in _CRITICAL_CHS]
-
-RESILIENCE_BASKETS = {
-    "ALL": {
-        "name": "All Product Categories",
-        "short_name": "All Products",
-        "chapters": [],
-        "desc": "Complete merchandise trade scope across all tariff lines"
-    },
-    "ENERGY": {
-        "name": "Energy & Fuels",
-        "short_name": "Energy & Fuels",
-        "chapters": ["27"],
-        "desc": "Refined petroleum, natural gas, electrical energy"
-    },
-    "FOOD": {
-        "name": "Food & Nutrition",
-        "short_name": "Food & Nutrition",
-        "chapters": ["01", "02", "03", "04", "10", "16", "19", "22", "1", "2", "3", "4"],
-        "desc": "Dairy, meat, cereals, beverages, essential nutrition"
-    },
-    "HEALTH": {
-        "name": "Health & Medicines",
-        "short_name": "Health & Medicines",
-        "chapters": ["30", "90"],
-        "desc": "Pharmaceutical products, surgical & medical instruments"
-    },
-    "METALS": {
-        "name": "Raw Materials & Metals",
-        "short_name": "Raw Materials & Metals",
-        "chapters": ["72", "73", "25", "26", "76"],
-        "desc": "Iron, steel, aluminium, construction minerals"
-    },
-    "TECH": {
-        "name": "Tech & Machinery",
-        "short_name": "Tech & Machinery",
-        "chapters": ["84", "85"],
-        "desc": "Computers, electrical generators, telecom apparatus"
-    },
-    "VEHICLES": {
-        "name": "Vehicles & Transport",
-        "short_name": "Vehicles & Transport",
-        "chapters": ["87", "88"],
-        "desc": "Passenger cars, commercial transport equipment, aerospace"
-    },
-    "NON_CRITICAL": {
-        "name": "Other Non-Critical Categories",
-        "short_name": "Non-Critical Categories",
-        "chapters": NON_CRITICAL_CHAPTERS,
-        "desc": "All merchandise tariff lines outside the 6 designated critical resilience baskets (Plastics, Rubber, Chemicals, Wood, Textiles, Paper, etc.)"
-    },
-}
-
-BASKET_FILTER_OPTIONS = [
-    {"label": "All Product Categories", "value": "ALL"},
-    {"label": "Energy & Fuels (27)", "value": "ENERGY"},
-    {"label": "Food & Nutrition (01–04, 10, 16, 19, 22)", "value": "FOOD"},
-    {"label": "Health & Medicines (30, 90)", "value": "HEALTH"},
-    {"label": "Raw Materials & Metals (25–26, 72–73, 76)", "value": "METALS"},
-    {"label": "Tech & Machinery (84, 85)", "value": "TECH"},
-    {"label": "Vehicles & Transport (87, 88)", "value": "VEHICLES"},
-    {"label": "Other Non-Critical Categories", "value": "NON_CRITICAL"},
-]
+from src.config import (
+    RESILIENCE_BASKETS, NON_CRITICAL_CHAPTERS, PEER_REPORTERS, PRIMARY_REPORTER,
+    EU27_CODES, NEIGHBOUR_CODES, DEFAULT_PARTNER_OPTIONS, DEFAULT_DRILLDOWN_PARTNER,
+)
+from src.dashboard.common import (
+    ISO2_NAMES_EN, get_country_name, BASKET_FILTER_OPTIONS, basket_chapters,
+    basket_short_name, filter_by_chapters, resolve_year,
+)
 
 
 app = dash.Dash(
@@ -642,8 +566,8 @@ def render_tab_resilience(selected_year):
     if sub_geo.empty and not partners_df.empty:
         sub_geo = partners_df[(partners_df["year"] == partners_df["year"].max()) & (partners_df["flow"] == "IMPORT")].copy()
 
-    eu_codes = {'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'}
-    neighbors = {'BE', 'DE', 'FR'}
+    eu_codes = EU27_CODES
+    neighbors = NEIGHBOUR_CODES
     tot_imp = sub_geo['value_eur'].sum() if not sub_geo.empty else 0.0
     neigh_val = sub_geo[sub_geo['partner_code'].isin(neighbors)]['value_eur'].sum() if not sub_geo.empty else 0.0
     other_eu_val = sub_geo[sub_geo['partner_code'].isin(eu_codes - neighbors)]['value_eur'].sum() if not sub_geo.empty else 0.0
@@ -655,7 +579,7 @@ def render_tab_resilience(selected_year):
 
     fig_donut = go.Figure(go.Pie(
         labels=[
-            "Direct Neighbors (BE, DE, FR)",
+            f"Direct Neighbors ({', '.join(sorted(NEIGHBOUR_CODES))})",
             "Other EU Member States",
             "Rest of World"
         ],
@@ -784,9 +708,9 @@ def render_tab_partners(selected_year):
     if not sub_yr.empty:
         top_p = sub_yr["partner_code"].head(30).tolist()
     else:
-        top_p = ["DE", "BE", "FR", "NL", "US", "CN", "IT", "GB", "PL", "CH", "ES", "JP", "CZ", "TR", "AT"]
+        top_p = list(DEFAULT_PARTNER_OPTIONS)
     q4_options = [{"label": f"{get_country_name(c)} ({c})", "value": c} for c in top_p]
-    def_q4_p = top_p[0] if top_p else "DE"
+    def_q4_p = top_p[0] if top_p else DEFAULT_DRILLDOWN_PARTNER
 
     return html.Div([
         # ── Section 2.1: Main Trading Partners & Bilateral Flows ──
@@ -1534,18 +1458,25 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year, shift_metri
     fig_bar.update_xaxes(range=[0, max_val_m * 1.25])
     fig_bar.update_layout(margin=dict(l=220 if granularity in (4, 8) else 190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    # Structural shift chart: dynamically track top product categories for this flow and basket
-    all_prod = load_product_rankings()
-    all_prod = all_prod[(all_prod["year"] >= START_YEAR) & (all_prod["year"] <= END_YEAR)]
+    # Structural shift chart: track the top-5 codes of the selected year (at the chosen
+    # granularity) across the whole span.
+    tier_cfg = {
+        8: (load_hs8_product_rankings, "hs8_code", "hs8_name", "CN"),
+        4: (load_hs4_product_rankings, "hs4_code", "hs4_name", "HS"),
+        2: (load_product_rankings, "hs2_code", "hs2_name", ""),
+    }
+    loader, t_code, t_name, _ = tier_cfg.get(granularity, tier_cfg[2])
+    all_prod = loader()
     sub_yr = all_prod[(all_prod["year"] == use_year) & (all_prod["flow"] == flow)]
     if chapters:
-        sub_yr = sub_yr[sub_yr["hs2_code"].astype(str).str[:2].isin(chapters)]
+        parent = sub_yr[t_code].astype(str).str[:2]
+        sub_yr = sub_yr[parent.isin(chapters)]
     sub_yr = sub_yr.sort_values("value_eur", ascending=False)
 
     if not sub_yr.empty:
         top5_chs = sub_yr.head(5)
-        key_chs = top5_chs["hs2_code"].tolist()
-        ch_names = {r["hs2_code"]: f"{r['hs2_name'][:20]} ({r['hs2_code']})" for _, r in top5_chs.iterrows()}
+        key_chs = top5_chs[t_code].tolist()
+        ch_names = {r[t_code]: f"{str(r[t_name])[:20]} ({r[t_code]})" for _, r in top5_chs.iterrows()}
     else:
         key_chs = chapters[:5] if chapters else ["72", "84", "87", "39", "30"]
         ch_names = {ch: f"{ch}" for ch in key_chs}
@@ -1555,7 +1486,7 @@ def update_q2_charts(flow, granularity, basket, selected_prod, year, shift_metri
 
     fig_shift = go.Figure()
     for ch in key_chs:
-        c_sub = all_prod[(all_prod["hs2_code"] == ch) & (all_prod["flow"] == flow)].sort_values("year")
+        c_sub = all_prod[(all_prod[t_code] == ch) & (all_prod["flow"] == flow)].sort_values("year")
         if not c_sub.empty:
             if is_share:
                 y_vals = c_sub["product_share_pct"]
@@ -1846,69 +1777,50 @@ def sync_q4_flow_from_q1(flow):
     Input("q4-level-radio", "value"),
     Input("q4-threshold-dropdown", "value"),
     Input("q4-basket-dropdown", "value"),
-    Input("global-year-dropdown", "value")
+    Input("global-year-dropdown", "value"),
+    Input("q1-metric-radio", "value"),
 )
-def update_q4_chart(partner_code, flow, level, threshold, basket, year):
+def update_q4_chart(partner_code, flow, level, threshold, basket, year, metric="value"):
     partner_code = str(partner_code or "DE").upper()
     level = int(level or 4)
     threshold = threshold or 15
+    use_share = metric == "share"
 
-    if level == 8:
-        df = load_drilldown_lvl8()
-    elif level == 4:
-        df = load_drilldown_lvl4()
-    else:
-        df = load_drilldown_lvl2()
+    def _slice(tier_df):
+        if tier_df is None or tier_df.empty:
+            return pd.DataFrame(), None
+        s = tier_df[(tier_df["partner_code"] == partner_code) & (tier_df["flow"] == flow)]
+        if s.empty:
+            return s.copy(), None
+        yr = resolve_year(s, year)
+        return s[s["year"] == yr].copy(), yr
 
-    sub = df[(df["partner_code"] == partner_code) & (df["flow"] == flow)].copy()
+    tiers = {8: load_drilldown_lvl8, 4: load_drilldown_lvl4, 2: load_drilldown_lvl2}
+    sub, use_year = _slice(tiers[level]())
     if sub.empty:
-        # Fallback to level 2 drilldown
-        df2 = load_drilldown_lvl2()
-        sub = df2[(df2["partner_code"] == partner_code) & (df2["flow"] == flow)].copy()
+        # Partner without HS4/CN8 extract: fall back to the HS2 tier (covers every partner)
+        sub, use_year = _slice(load_drilldown_lvl2())
         level = 2
-
-    if sub.empty:
-        # Fallback to product_partners (which covers all 237 partner countries)
-        pp_df = load_product_partners()
-        pp_df = pp_df[(pp_df["year"] >= START_YEAR) & (pp_df["year"] <= END_YEAR)]
-        max_pp_yr = int(pp_df["year"].max()) if not pp_df.empty else END_YEAR
-        use_year = year if (not pp_df.empty and year in pp_df["year"].values) else max_pp_yr
-        sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow) & (pp_df["year"] == use_year)].copy()
-        if sub_pp.empty:
-            sub_pp = pp_df[(pp_df["partner_code"] == partner_code) & (pp_df["flow"] == flow)].copy()
-            if not sub_pp.empty:
-                sub_pp = sub_pp[sub_pp["year"] == max_pp_yr]
-        if not sub_pp.empty:
-            sub = pd.DataFrame({
-                "partner_code": sub_pp["partner_code"],
-                "flow": sub_pp["flow"],
-                "product_code": sub_pp["hs2_code"],
-                "product_name": sub_pp["hs2_name"],
-                "value_eur": sub_pp["value_eur"],
-                "level": 2
-            })
-            level = 2
+    use_year = use_year or year or END_YEAR
 
     # Resilience basket filtering
-    basket_name = RESILIENCE_BASKETS.get(basket, {}).get("short_name", "")
+    basket_name = basket_short_name(basket)
     basket_suffix = f" [{basket_name}]" if (basket and basket != "ALL") else ""
+    if basket and basket != "ALL" and not sub.empty:
+        sub = filter_by_chapters(sub, "product_code", basket_chapters(basket))
 
-    if basket and basket != "ALL":
-        chapters = RESILIENCE_BASKETS.get(basket, {}).get("chapters", [])
-        if chapters and not sub.empty:
-            sub = sub[sub["product_code"].astype(str).str[:2].isin(chapters)]
-
-    use_year = year or END_YEAR
+    x_title = "Share of partner flow (%)" if use_share else "Million Euros (€M)"
+    title_txt = f"FIGURE 2.4: {get_country_name(partner_code).upper()} ({partner_code}) — LEVEL {level} TARIFF BREAKDOWN ({flow.upper()}) IN {use_year}{basket_suffix}"
 
     if sub.empty:
         fig = go.Figure()
-        apply_plot_theme(fig, x_title="Million Euros (€M)")
+        apply_plot_theme(fig, x_title=x_title)
         fig.add_annotation(
             text=f"No traded lines recorded for basket '{basket_name or basket}'",
             xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
             font=dict(size=13, color=TEXT_MUTED, family="Inter, sans-serif")
         )
-        return f"FIGURE 2.4: {get_country_name(partner_code).upper()} ({partner_code}) — LEVEL {level} TARIFF BREAKDOWN ({flow.upper()}) IN {use_year}{basket_suffix}", fig
+        return title_txt, fig
 
     if threshold in [15, 25]:
         sub = sub.sort_values("value_eur", ascending=False).head(int(threshold)).copy()
@@ -1917,22 +1829,30 @@ def update_q4_chart(partner_code, flow, level, threshold, basket, year):
 
     sub["label"] = sub["product_code"].astype(str) + " - " + sub["product_name"].apply(lambda s: str(s)[:38] + ".." if len(str(s)) > 38 else str(s))
 
+    if use_share:
+        xs = sub["share_pct"]
+        texts = [f"{v:.1f}%" for v in xs]
+        hover = "<b>%{y}</b><br>Share: %{x:,.2f}%<extra></extra>"
+    else:
+        xs = sub["value_eur"] / 1e6
+        texts = [fmt_eur(v) for v in sub["value_eur"]]
+        hover = "<b>%{y}</b><br>Value: €%{x:,.2f}M<extra></extra>"
+
     fig = go.Figure(go.Bar(
-        x=sub["value_eur"] / 1e6,
+        x=xs,
         y=sub["label"],
         orientation="h",
         marker_color=SECONDARY if flow == "IMPORT" else PRIMARY,
-        text=[fmt_eur(v) for v in sub["value_eur"]],
+        text=texts,
         textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Value: €%{x:,.2f}M<extra></extra>"
+        hovertemplate=hover
     ))
-    apply_plot_theme(fig, x_title="Million Euros (€M)")
-    max_val_m = (sub["value_eur"] / 1e6).max() if not sub.empty else 100
-    fig.update_xaxes(range=[0, max_val_m * 1.25])
+    apply_plot_theme(fig, x_title=x_title)
+    max_x = float(xs.max()) if not sub.empty else 100
+    fig.update_xaxes(range=[0, max_x * 1.25])
     fig.update_layout(margin=dict(l=190, r=50, t=10, b=30), yaxis=dict(autorange="reversed"))
 
-    title = f"FIGURE 2.4: {get_country_name(partner_code).upper()} ({partner_code}) — LEVEL {level} TARIFF BREAKDOWN ({flow.upper()}) IN {use_year}{basket_suffix}"
-    return title, fig
+    return title_txt, fig
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -1960,6 +1880,22 @@ BENCHMARK_PRODUCT_OPTIONS = [
     {"label": "62 — Apparel & Clothing Accessories", "value": "62"},
     {"label": "88 — Aircraft, Spacecraft & Parts", "value": "88"},
 ]
+def _extend_benchmark_options(options):
+    """Append every chapter found in the benchmark data that has no curated label yet."""
+    try:
+        bench = load_country_benchmarks()
+        known = {o["value"] for o in options}
+        extra = (bench[["product_code", "product_name"]].drop_duplicates()
+                 if not bench.empty else pd.DataFrame(columns=["product_code", "product_name"]))
+        for code, name in sorted(zip(extra["product_code"].astype(str), extra["product_name"].astype(str))):
+            if code != "TOTAL" and code not in known:
+                options.append({"label": f"{code} — {name[:40]}", "value": code})
+    except Exception:
+        pass
+    return options
+
+
+BENCHMARK_PRODUCT_OPTIONS = _extend_benchmark_options(BENCHMARK_PRODUCT_OPTIONS)
 BENCHMARK_PRODUCT_MAP = {opt["value"]: opt["label"] for opt in BENCHMARK_PRODUCT_OPTIONS}
 
 
@@ -1980,7 +1916,7 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
     flow_metric = str(flow_metric or "volume").lower()
 
     country_colors = {"LU": STATEC_YELLOW, "DE": STATEC_NAVY, "FR": STATEC_BLUE, "BE": "#DC2626", "NL": "#D97706"}
-    country_names = {"LU": "Luxembourg", "DE": "Germany", "FR": "France", "BE": "Belgium", "NL": "Netherlands"}
+    country_names = {c: get_country_name(c) for c in PEER_REPORTERS}
 
     min_yr = int(sub_prod["year"].min()) if not sub_prod.empty else START_YEAR
     max_yr = int(sub_prod["year"].max()) if not sub_prod.empty else END_YEAR
@@ -1990,27 +1926,27 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
     n_elapsed = max_yr - min_yr
 
     if flow_metric == "import":
-        index_col = "import_index_2000"
+        index_col = "import_index_base"
         flow_name = "Import Growth"
         left_title = f"FIGURE 4.1: {product_label.upper()} — IMPORT GROWTH TRAJECTORY (BASE 100 = {min_yr})"
         right_title = f"FIGURE 4.2: {product_label.upper()} — IMPORT VALUE IN {use_year} (€M)"
     elif flow_metric == "export":
-        index_col = "export_index_2000"
+        index_col = "export_index_base"
         flow_name = "Export Growth"
         left_title = f"FIGURE 4.1: {product_label.upper()} — EXPORT GROWTH TRAJECTORY (BASE 100 = {min_yr})"
         right_title = f"FIGURE 4.2: {product_label.upper()} — EXPORT VALUE IN {use_year} (€M)"
     else:
-        index_col = "volume_index_2000"
+        index_col = "volume_index_base"
         flow_name = "Trade Volume Growth"
         left_title = f"FIGURE 4.1: {product_label.upper()} — TRADE VOLUME GROWTH TRAJECTORY (BASE 100 = {min_yr})"
         right_title = f"FIGURE 4.2: {product_label.upper()} — TRADE COVERAGE RATIO IN {use_year} (EXPORTS / IMPORTS %)"
 
     # Compute CAGR badges across peer economies
     cagr_badges = []
-    for c in ["LU", "DE", "FR", "BE", "NL"]:
+    for c in PEER_REPORTERS:
         c_sub = sub_prod[sub_prod["reporter_code"] == c].sort_values("year")
         color = country_colors.get(c, STATEC_GRAY)
-        is_lu = (c == "LU")
+        is_lu = (c == PRIMARY_REPORTER)
         cagr_str = "N/A"
         if len(c_sub) >= 2 and index_col in c_sub.columns:
             v_start = float(c_sub.iloc[0][index_col])
@@ -2041,15 +1977,15 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
 
     # Left chart: Multi-country trajectory line chart
     fig_index = go.Figure()
-    for c in ["LU", "DE", "FR", "BE", "NL"]:
+    for c in PEER_REPORTERS:
         c_sub = sub_prod[sub_prod["reporter_code"] == c].sort_values("year")
         if not c_sub.empty and index_col in c_sub.columns:
             fig_index.add_trace(go.Scatter(
                 x=c_sub["year"], y=c_sub[index_col],
                 name=country_names.get(c, c),
-                mode="lines+markers" if c == "LU" else "lines",
-                line=dict(color=country_colors.get(c, STATEC_GRAY), width=3.5 if c == "LU" else 2),
-                marker=dict(size=6 if c == "LU" else 0),
+                mode="lines+markers" if c == PRIMARY_REPORTER else "lines",
+                line=dict(color=country_colors.get(c, STATEC_GRAY), width=3.5 if c == PRIMARY_REPORTER else 2),
+                marker=dict(size=6 if c == PRIMARY_REPORTER else 0),
                 hovertemplate="%{x}: Index %{y:.1f}<extra></extra>"
             ))
 
@@ -2083,7 +2019,7 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
             y=sub_yr["name"],
             showlegend=False,
             orientation="h",
-            marker_color=[STATEC_YELLOW if r == "LU" else STATEC_BLUE for r in sub_yr["reporter_code"]],
+            marker_color=[STATEC_YELLOW if r == PRIMARY_REPORTER else STATEC_BLUE for r in sub_yr["reporter_code"]],
             text=sub_yr["val_m"].apply(lambda v: f"€{v:,.1f}M" if v < 1000 else f"€{v/1000:,.2f}B"),
             textposition="outside",
             hovertemplate="%{y}: €%{x:,.1f}M<extra></extra>"
@@ -2106,7 +2042,7 @@ def generate_q5_figures(product_code="TOTAL", flow_metric="volume", selected_yea
             y=sub_yr["name"],
             showlegend=False,
             orientation="h",
-            marker_color=[STATEC_YELLOW if r == "LU" else (SUCCESS if v >= 100 else SECONDARY) for r, v in zip(sub_yr["reporter_code"], sub_yr["coverage_ratio_pct"])],
+            marker_color=[STATEC_YELLOW if r == PRIMARY_REPORTER else (SUCCESS if v >= 100 else SECONDARY) for r, v in zip(sub_yr["reporter_code"], sub_yr["coverage_ratio_pct"])],
             text=sub_yr["coverage_ratio_pct"].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
             hovertemplate="%{y}: Coverage Ratio %{x:.1f}%<extra></extra>"
@@ -2390,9 +2326,10 @@ def update_sea_product_options(basket, current_val):
     Output("sea-factors-chart", "figure"),
     Input("sea-product-dropdown", "value"),
     Input("sea-flow-radio", "value"),
-    Input("sea-series-checklist", "value")
+    Input("sea-series-checklist", "value"),
+    Input("global-year-dropdown", "value"),
 )
-def update_seasonality_charts(product, flow, selected_series):
+def update_seasonality_charts(product, flow, selected_series, year=None):
     sea_df = load_seasonal_decomposition()
     if not sea_df.empty:
         sea_df = sea_df[(sea_df["year"] >= START_YEAR) & (sea_df["year"] <= END_YEAR)]
@@ -2439,24 +2376,41 @@ def update_seasonality_charts(product, flow, selected_series):
             hovertemplate="%{x}: SA €%{y:,.1f}M<extra></extra>"
         ))
     apply_plot_theme(fig_ts, y_title="Million Euros (€M)", hovermode="x unified")
-    min_sub_date = str(sub["date"].min())[:10] if not sub.empty else f"{START_YEAR}-01-01"
-    max_sub_date = str(sub["date"].max())[:10] if not sub.empty else f"{END_YEAR}-12-31"
+    sub["date"] = pd.to_datetime(sub["date"])
+    min_ts, max_ts = sub["date"].min(), sub["date"].max()
+    min_sub_date = min_ts.strftime("%Y-%m-%d")
+    max_sub_date = max_ts.strftime("%Y-%m-%d")
+
+    def _back(years):
+        start = max(min_ts, max_ts - pd.DateOffset(years=years))
+        return [start.strftime("%Y-%m-%d"), max_sub_date]
+
+    # Explicit relayout ranges (anchored on the series end) instead of
+    # stepmode="backward", which drifted relative to the rangeslider window.
     fig_ts.update_xaxes(
         range=[min_sub_date, max_sub_date],
-        rangeselector=dict(
-            buttons=list([
-                dict(count=2, label="2Y", step="year", stepmode="backward"),
-                dict(count=5, label="5Y", step="year", stepmode="backward"),
-                dict(count=10, label="10Y", step="year", stepmode="backward"),
-                dict(step="all", label="All")
-            ]),
-            bgcolor="#F1F5F9",
-            activecolor="#CBD5E1",
-            font=dict(size=10, family="Inter, sans-serif")
-        ),
-        rangeslider=dict(visible=True, thickness=0.08),
+        rangeslider=dict(visible=True, thickness=0.08, range=[min_sub_date, max_sub_date]),
         type="date"
     )
+    fig_ts.update_layout(updatemenus=[dict(
+        type="buttons", direction="right", x=0, xanchor="left", y=1.02, yanchor="bottom",
+        pad=dict(l=0, r=0, t=0, b=0), showactive=False,
+        bgcolor="#F1F5F9", bordercolor="#E2E8F0", font=dict(size=10, family="Inter, sans-serif"),
+        buttons=[
+            dict(label="2Y", method="relayout", args=[{"xaxis.range": _back(2)}]),
+            dict(label="5Y", method="relayout", args=[{"xaxis.range": _back(5)}]),
+            dict(label="10Y", method="relayout", args=[{"xaxis.range": _back(10)}]),
+            dict(label="All", method="relayout", args=[{"xaxis.range": [min_sub_date, max_sub_date]}]),
+        ],
+    )])
+
+    # Trailing window ending at the selected year drives the seasonal factors (Fig 5.2)
+    sub["_year"] = sub["date"].dt.year
+    y_sel = int(year) if year is not None else int(sub["_year"].max())
+    win = sub[(sub["_year"] <= y_sel) & (sub["_year"] >= y_sel - 9)]
+    if win["_year"].nunique() < 3:
+        first = int(sub["_year"].min())
+        win = sub[sub["_year"] <= first + 4]
     fig_ts.update_layout(
         margin=dict(l=10, r=20, t=25, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(family="Inter, sans-serif", size=10))
@@ -2465,7 +2419,7 @@ def update_seasonality_charts(product, flow, selected_series):
     # Factors chart
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     if flow == "BALANCE":
-        factors = sub.groupby("month")["seasonal_dev_eur"].mean().reset_index()
+        factors = win.groupby("month")["seasonal_dev_eur"].mean().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
         dev_m = factors["seasonal_dev_eur"] / 1e6
         thresh_m = max(5.0, round(float(dev_m.abs().quantile(0.75)), 1))
@@ -2485,7 +2439,11 @@ def update_seasonality_charts(product, flow, selected_series):
         fig_factors.add_trace(go.Bar(name=f"Deficit Widening (< -€{thresh_m:.1f}M)", x=[None], y=[None], marker_color=DANGER, showlegend=True))
         y_vals = dev_m
     else:
-        factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
+        if "ratio_to_trend" in win.columns and win["ratio_to_trend"].notna().any():
+            factors = win.groupby("month")["ratio_to_trend"].median().reset_index(name="seasonal_factor")
+            factors["seasonal_factor"] = factors["seasonal_factor"] / factors["seasonal_factor"].mean()
+        else:
+            factors = sub.groupby("month")["seasonal_factor"].first().reset_index()
         factors["month_name"] = factors["month"].apply(lambda m: months[m - 1])
         dev_pct = (factors["seasonal_factor"] - 1.0) * 100
         thresh_pct = max(3.0, round(float(dev_pct.abs().quantile(0.75)), 1))
